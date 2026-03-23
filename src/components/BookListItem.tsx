@@ -8,9 +8,9 @@ interface BookListItemProps {
 }
 
 const STATUS_LABELS: Record<Book["status"], string> = {
-  available: "Dostepna",
-  borrowed: "Pozyczona",
-  for_sale: "Na sprzedaz",
+  available: "Dost\u0119pna",
+  borrowed: "Po\u017cyczona",
+  for_sale: "Na sprzeda\u017c",
   sold: "Sprzedana",
   needs_review: "Do poprawy"
 };
@@ -25,11 +25,11 @@ export function BookListItem({ book, onPress }: BookListItemProps) {
         <View style={styles.badge}>
           <Text style={styles.badgeText}>{STATUS_LABELS[book.status]}</Text>
         </View>
-        <Text style={styles.arrow}>›</Text>
+        <Text style={styles.arrow}>{">"}</Text>
       </View>
       <View style={styles.copy}>
-        <Text style={styles.title}>{book.title || "Bez tytulu"}</Text>
-        <Text style={styles.meta}>{book.author || "Autor do uzupelnienia"}</Text>
+        <Text style={styles.title}>{book.title || "Bez tytu\u0142u"}</Text>
+        <Text style={styles.meta}>{book.author || "Autor do uzupe\u0142nienia"}</Text>
         <View style={styles.metaRow}>
           {book.shelfLocation ? (
             <Text style={styles.metaPill}>{book.shelfLocation}</Text>

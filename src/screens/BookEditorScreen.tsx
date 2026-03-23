@@ -40,9 +40,9 @@ interface BookEditorScreenProps {
 }
 
 const STATUS_OPTIONS: Array<{ key: BookStatus; label: string }> = [
-  { key: "available", label: "Dostepna" },
-  { key: "borrowed", label: "Pozyczona" },
-  { key: "for_sale", label: "Na sprzedaz" },
+  { key: "available", label: "Dost\u0119pna" },
+  { key: "borrowed", label: "Po\u017cyczona" },
+  { key: "for_sale", label: "Na sprzeda\u017c" },
   { key: "sold", label: "Sprzedana" },
   { key: "needs_review", label: "Do poprawy" }
 ];
@@ -88,7 +88,9 @@ function createDraft(book?: Book | null): BookDraft {
 }
 
 function toBook(draft: BookDraft): Book {
-  const parsedPrice = draft.price.trim() ? Number(draft.price.replace(",", ".")) : undefined;
+  const parsedPrice = draft.price.trim()
+    ? Number(draft.price.replace(",", "."))
+    : undefined;
 
   return {
     id: draft.id,
@@ -126,11 +128,14 @@ export function BookEditorScreen({
   }, [book]);
 
   const screenTitle = useMemo(
-    () => (book ? "Edytuj ksiazke" : "Dodaj ksiazke"),
+    () => (book ? "Edytuj ksi\u0105\u017ck\u0119" : "Dodaj ksi\u0105\u017ck\u0119"),
     [book]
   );
 
-  const updateDraft = <K extends keyof BookDraft>(key: K, value: BookDraft[K]) => {
+  const updateDraft = <K extends keyof BookDraft>(
+    key: K,
+    value: BookDraft[K]
+  ) => {
     setDraft((current) => ({
       ...current,
       [key]: value
@@ -146,11 +151,11 @@ export function BookEditorScreen({
       setSearchResults(results);
 
       if (!results.length) {
-        setSearchError("Nie znaleziono podobnych tytulow.");
+        setSearchError("Nie znaleziono podobnych tytu\u0142\u00f3w.");
       }
     } catch (error) {
       setSearchError(
-        error instanceof Error ? error.message : "Nie udalo sie pobrac wynikow."
+        error instanceof Error ? error.message : "Nie uda\u0142o si\u0119 pobra\u0107 wynik\u00f3w."
       );
       setSearchResults([]);
     } finally {
@@ -169,7 +174,10 @@ export function BookEditorScreen({
 
   const handleSave = async () => {
     if (!draft.title.trim()) {
-      Alert.alert("Brakuje tytulu", "Uzupelnij tytul przed zapisem.");
+      Alert.alert(
+        "Brakuje tytu\u0142u",
+        "Uzupe\u0142nij tytu\u0142 przed zapisem."
+      );
       return;
     }
 
@@ -189,49 +197,57 @@ export function BookEditorScreen({
       return;
     }
 
-    Alert.alert("Usunac ksiazke?", "Ta operacja usunie wpis z katalogu.", [
-      { text: "Anuluj", style: "cancel" },
-      {
-        text: "Usun",
-        style: "destructive",
-        onPress: async () => {
-          setIsDeleting(true);
+    Alert.alert(
+      "Usun\u0105\u0107 ksi\u0105\u017ck\u0119?",
+      "Ta operacja usunie wpis z katalogu.",
+      [
+        { text: "Anuluj", style: "cancel" },
+        {
+          text: "Usu\u0144",
+          style: "destructive",
+          onPress: async () => {
+            setIsDeleting(true);
 
-          try {
-            await deleteBook(book.id);
-            onSaved();
-          } finally {
-            setIsDeleting(false);
+            try {
+              await deleteBook(book.id);
+              onSaved();
+            } finally {
+              setIsDeleting(false);
+            }
           }
         }
-      }
-    ]);
+      ]
+    );
   };
 
   return (
     <ScrollView contentContainerStyle={styles.content}>
       <SectionCard
         title={screenTitle}
-        subtitle={"Uzupelnij dane recznie albo podpowiedz je wyszukiwaniem online."}
+        subtitle={
+          "Uzupe\u0142nij dane r\u0119cznie albo podpowiedz je wyszukiwaniem online."
+        }
       >
         <View style={styles.topActions}>
           <Pressable onPress={onBack} style={styles.secondaryButton}>
-            <Text style={styles.secondaryButtonLabel}>Wroc</Text>
+            <Text style={styles.secondaryButtonLabel}>Wr\u00f3\u0107</Text>
           </Pressable>
           <Pressable
             onPress={handleDelete}
             disabled={isDeleting}
             style={[styles.secondaryButton, styles.dangerButton]}
           >
-            <Text style={[styles.secondaryButtonLabel, styles.dangerButtonLabel]}>
-              {book ? (isDeleting ? "Usuwanie..." : "Usun") : "Anuluj"}
+            <Text
+              style={[styles.secondaryButtonLabel, styles.dangerButtonLabel]}
+            >
+              {book ? (isDeleting ? "Usuwanie..." : "Usu\u0144") : "Anuluj"}
             </Text>
           </Pressable>
         </View>
 
         <View style={styles.form}>
           <Field
-            label="Tytul"
+            label="Tytu\u0142"
             value={draft.title}
             onChangeText={(value) => updateDraft("title", value)}
             placeholder="Np. Lalka"
@@ -240,7 +256,7 @@ export function BookEditorScreen({
             label="Autor"
             value={draft.author}
             onChangeText={(value) => updateDraft("author", value)}
-            placeholder="Np. Boleslaw Prus"
+            placeholder="Np. Boles\u0142aw Prus"
           />
           <View style={styles.inlineActions}>
             <PrimaryButton
@@ -251,7 +267,9 @@ export function BookEditorScreen({
               disabled={isSearching}
             />
           </View>
-          {searchError ? <Text style={styles.helperError}>{searchError}</Text> : null}
+          {searchError ? (
+            <Text style={styles.helperError}>{searchError}</Text>
+          ) : null}
           {searchResults.length ? (
             <View style={styles.searchResults}>
               {searchResults.map((result) => (
@@ -282,7 +300,7 @@ export function BookEditorScreen({
             label="Lokalizacja"
             value={draft.shelfLocation}
             onChangeText={(value) => updateDraft("shelfLocation", value)}
-            placeholder="Np. Salon / Polka A"
+            placeholder="Np. Salon / P\u00f3\u0142ka A"
           />
           <Field
             label="Cena"
@@ -292,7 +310,7 @@ export function BookEditorScreen({
             keyboardType="decimal-pad"
           />
           <Field
-            label="Pozyczona komu"
+            label="Po\u017cyczona komu"
             value={draft.borrowedTo}
             onChangeText={(value) => updateDraft("borrowedTo", value)}
             placeholder="Opcjonalnie"
@@ -321,7 +339,10 @@ export function BookEditorScreen({
                   <Pressable
                     key={option.key}
                     onPress={() => updateDraft("status", option.key)}
-                    style={[styles.statusChip, isActive ? styles.statusChipActive : null]}
+                    style={[
+                      styles.statusChip,
+                      isActive ? styles.statusChipActive : null
+                    ]}
                   >
                     <Text
                       style={[

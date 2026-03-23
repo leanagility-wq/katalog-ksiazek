@@ -28,7 +28,7 @@ export const useLibraryStore = create<LibraryState>((set) => ({
         errorMessage:
           error instanceof Error
             ? error.message
-            : "Nie udalo sie zaladowac katalogu."
+            : "Nie uda\u0142o si\u0119 za\u0142adowa\u0107 katalogu."
       });
     }
   },
@@ -40,7 +40,9 @@ export const useLibraryStore = create<LibraryState>((set) => ({
     } catch (error) {
       set({
         errorMessage:
-          error instanceof Error ? error.message : "Nie udalo sie zapisac ksiazki."
+          error instanceof Error
+            ? error.message
+            : "Nie uda\u0142o si\u0119 zapisa\u0107 ksi\u0105\u017cki."
       });
     }
   },
@@ -52,7 +54,9 @@ export const useLibraryStore = create<LibraryState>((set) => ({
     } catch (error) {
       set({
         errorMessage:
-          error instanceof Error ? error.message : "Nie udalo sie usunac ksiazki."
+          error instanceof Error
+            ? error.message
+            : "Nie uda\u0142o si\u0119 usun\u0105\u0107 ksi\u0105\u017cki."
       });
     }
   }

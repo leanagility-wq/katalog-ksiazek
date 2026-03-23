@@ -44,19 +44,21 @@ async function seedDatabase(db: SQLiteDatabase) {
         )
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `,
-      book.id,
-      book.title,
-      book.author,
-      book.isbn ?? null,
-      book.shelfLocation ?? null,
-      book.imageUri ?? null,
-      book.ocrText,
-      book.price ?? null,
-      book.borrowedTo ?? null,
-      book.notes ?? null,
-      book.status,
-      book.createdAt,
-      book.updatedAt
+      [
+        book.id,
+        book.title,
+        book.author,
+        book.isbn ?? null,
+        book.shelfLocation ?? null,
+        book.imageUri ?? null,
+        book.ocrText,
+        book.price ?? null,
+        book.borrowedTo ?? null,
+        book.notes ?? null,
+        book.status,
+        book.createdAt,
+        book.updatedAt
+      ]
     );
   }
 }

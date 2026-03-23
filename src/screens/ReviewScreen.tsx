@@ -1,11 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import {
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  View
-} from "react-native";
+import { ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 
 import { PrimaryButton } from "@/components/PrimaryButton";
 import { SectionCard } from "@/components/SectionCard";
@@ -35,14 +29,14 @@ function confidenceLabel(confidence?: number) {
   }
 
   if (confidence >= 0.82) {
-    return `Wysoka pewność (${Math.round(confidence * 100)}%)`;
+    return `Wysoka pewno\u015b\u0107 (${Math.round(confidence * 100)}%)`;
   }
 
   if (confidence >= 0.6) {
-    return `Średnia pewność (${Math.round(confidence * 100)}%)`;
+    return `\u015arednia pewno\u015b\u0107 (${Math.round(confidence * 100)}%)`;
   }
 
-  return `Niska pewność (${Math.round(confidence * 100)}%)`;
+  return `Niska pewno\u015b\u0107 (${Math.round(confidence * 100)}%)`;
 }
 
 export function ReviewScreen({
@@ -90,34 +84,37 @@ export function ReviewScreen({
   const handleSave = async () => {
     setIsSaving(true);
 
-    for (const item of items) {
-      await saveBook(
-        mapCandidateToBook(
-          {
-            id: item.id,
-            rawText: item.rawText,
-            titleSuggestion: item.titleSuggestion,
-            authorSuggestion: item.authorSuggestion
-          },
-          {
-            imageUri: scanSession?.imageUri
-          }
-        )
-      );
-    }
+    try {
+      for (const item of items) {
+        await saveBook(
+          mapCandidateToBook(
+            {
+              id: item.id,
+              rawText: item.rawText,
+              titleSuggestion: item.titleSuggestion,
+              authorSuggestion: item.authorSuggestion
+            },
+            {
+              imageUri: scanSession?.imageUri
+            }
+          )
+        );
+      }
 
-    setIsSaving(false);
-    onComplete();
+      onComplete();
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   if (!scanSession) {
     return (
       <ScrollView contentContainerStyle={styles.content}>
         <SectionCard
-          title="Przegląd OCR"
-          subtitle="Nie ma jeszcze aktywnego skanu. Najpierw przejdź do ekranu skanowania."
+          title="Przegl\u0105d OCR"
+          subtitle="Nie ma jeszcze aktywnego skanu. Najpierw przejd\u017a do ekranu skanowania."
         >
-          <PrimaryButton label="Wróć do skanowania" onPress={onCancel} />
+          <PrimaryButton label="Wr\u00f3\u0107 do skanowania" onPress={onCancel} />
         </SectionCard>
       </ScrollView>
     );
@@ -126,17 +123,19 @@ export function ReviewScreen({
   return (
     <ScrollView contentContainerStyle={styles.content}>
       <SectionCard
-        title="Przegląd OCR"
+        title="Przegl\u0105d OCR"
         subtitle={`Skan: ${scanSession.imageLabel}. Rozpoznane pozycje: ${items.length}`}
       >
         <Text style={styles.helper}>
-          Sprawdź przede wszystkim wpisy oznaczone do uwagi. To one najczęściej wymagają ręcznej korekty.
+          Sprawd\u017a przede wszystkim wpisy oznaczone do uwagi. To one najcz\u0119\u015bciej wymagaj\u0105 r\u0119cznej korekty.
         </Text>
         <Text style={styles.summary}>
           Wymaga uwagi: {attentionCount} z {items.length}
         </Text>
         {scanSession.imageUri ? (
-          <Text style={styles.meta}>Źródło obrazu: {scanSession.imageUri}</Text>
+          <Text style={styles.meta}>
+            \u0179r\u00f3d\u0142o obrazu: {scanSession.imageUri}
+          </Text>
         ) : null}
       </SectionCard>
 
@@ -159,7 +158,7 @@ export function ReviewScreen({
                   item.needsAttention ? styles.badgeWarningText : styles.badgeOkText
                 ]}
               >
-                {item.needsAttention ? "Sprawdź ręcznie" : "Wygląda dobrze"}
+                {item.needsAttention ? "Sprawd\u017a r\u0119cznie" : "Wygl\u0105da dobrze"}
               </Text>
             </View>
             <Text style={styles.confidence}>{confidenceLabel(item.confidence)}</Text>
@@ -168,32 +167,30 @@ export function ReviewScreen({
             <Text style={styles.reviewReason}>{item.reviewReason}</Text>
           ) : null}
           <View style={styles.field}>
-            <Text style={styles.label}>Tytuł</Text>
+            <Text style={styles.label}>Tytu\u0142</Text>
             <TextInput
               value={item.titleSuggestion}
-              onChangeText={(value) =>
-                handleChange(item.id, "titleSuggestion", value)
-              }
+              onChangeText={(value) => handleChange(item.id, "titleSuggestion", value)}
               style={styles.input}
-              placeholder="Tytuł książki"
+              placeholder="Tytu\u0142 ksi\u0105\u017cki"
+              placeholderTextColor="#9a8a76"
             />
           </View>
           <View style={styles.field}>
             <Text style={styles.label}>Autor</Text>
             <TextInput
               value={item.authorSuggestion}
-              onChangeText={(value) =>
-                handleChange(item.id, "authorSuggestion", value)
-              }
+              onChangeText={(value) => handleChange(item.id, "authorSuggestion", value)}
               style={styles.input}
               placeholder="Autor"
+              placeholderTextColor="#9a8a76"
             />
           </View>
         </SectionCard>
       ))}
 
       <View style={styles.actions}>
-        <PrimaryButton label="Wróć do skanu" onPress={onCancel} />
+        <PrimaryButton label="Wr\u00f3\u0107 do skanu" onPress={onCancel} />
         <PrimaryButton
           label={isSaving ? "Zapisywanie..." : "Zapisz w katalogu"}
           onPress={() => void handleSave()}

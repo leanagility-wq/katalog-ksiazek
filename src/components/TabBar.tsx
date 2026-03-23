@@ -11,7 +11,7 @@ interface TabBarProps {
 const tabs: { key: TabKey; label: string }[] = [
   { key: "library", label: "Katalog" },
   { key: "scan", label: "Skan" },
-  { key: "review", label: "Przegląd" },
+  { key: "review", label: "Przegl\u0105d" },
   { key: "export", label: "Eksport" },
   { key: "settings", label: "Ustawienia" }
 ];

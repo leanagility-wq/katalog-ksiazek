@@ -69,25 +69,27 @@ class SQLiteBookRepository implements BookRepository {
           createdAt = excluded.createdAt,
           updatedAt = excluded.updatedAt
       `,
-      normalizedBook.id,
-      normalizedBook.title,
-      normalizedBook.author,
-      normalizedBook.isbn ?? null,
-      normalizedBook.shelfLocation ?? null,
-      normalizedBook.imageUri ?? null,
-      normalizedBook.ocrText,
-      normalizedBook.price ?? null,
-      normalizedBook.borrowedTo ?? null,
-      normalizedBook.notes ?? null,
-      normalizedBook.status,
-      normalizedBook.createdAt,
-      normalizedBook.updatedAt
+      [
+        normalizedBook.id,
+        normalizedBook.title,
+        normalizedBook.author,
+        normalizedBook.isbn ?? null,
+        normalizedBook.shelfLocation ?? null,
+        normalizedBook.imageUri ?? null,
+        normalizedBook.ocrText,
+        normalizedBook.price ?? null,
+        normalizedBook.borrowedTo ?? null,
+        normalizedBook.notes ?? null,
+        normalizedBook.status,
+        normalizedBook.createdAt,
+        normalizedBook.updatedAt
+      ]
     );
   }
 
   async remove(id: string) {
     const db = await getDatabase();
-    await db.runAsync("DELETE FROM books WHERE id = ?", id);
+    await db.runAsync("DELETE FROM books WHERE id = ?", [id]);
   }
 }
 
