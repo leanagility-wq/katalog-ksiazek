@@ -14,6 +14,10 @@ interface LibraryState {
   errorMessage: string | null;
   loadBooks: () => Promise<void>;
   saveBook: (book: Book, resolution?: DuplicateSaveResolution) => Promise<void>;
+  applyBatchUpdate: (
+    ids: string[],
+    changes: Partial<Pick<Book, "status" | "shelfLocation">>
+  ) => Promise<void>;
   deleteBook: (id: string) => Promise<void>;
 }
 
@@ -82,6 +86,24 @@ export const useLibraryStore = create<LibraryState>((set) => ({
       const resolvedError = toLibraryError(
         error,
         "Nie udało się zapisać książki."
+      );
+
+      set({
+        errorMessage: resolvedError.message
+      });
+
+      throw resolvedError;
+    }
+  },
+  applyBatchUpdate: async (ids, changes) => {
+    try {
+      await bookRepository.updateMany(ids, changes);
+      const books = await bookRepository.list();
+      set({ books, errorMessage: null });
+    } catch (error) {
+      const resolvedError = toLibraryError(
+        error,
+        "Nie udało się zapisać zmian zbiorczych."
       );
 
       set({

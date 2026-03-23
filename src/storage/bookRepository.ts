@@ -6,6 +6,10 @@ import { toSqlValue } from "@/utils/sql";
 export interface BookRepository {
   list(): Promise<Book[]>;
   save(book: Book): Promise<void>;
+  updateMany(
+    ids: string[],
+    changes: Partial<Pick<Book, "status" | "shelfLocation">>
+  ): Promise<void>;
   remove(id: string): Promise<void>;
 }
 
@@ -82,6 +86,38 @@ class SQLiteBookRepository implements BookRepository {
         status = excluded.status,
         createdAt = excluded.createdAt,
         updatedAt = excluded.updatedAt;
+    `);
+  }
+
+  async updateMany(
+    ids: string[],
+    changes: Partial<Pick<Book, "status" | "shelfLocation">>
+  ) {
+    if (!ids.length) {
+      return;
+    }
+
+    const db = await getDatabase();
+    const bookIds = ids.map((id) => toSqlValue(id)).join(", ");
+    const updates: string[] = [];
+
+    if (Object.prototype.hasOwnProperty.call(changes, "status")) {
+      updates.push(`status = ${toSqlValue(changes.status ?? null)}`);
+    }
+
+    if (Object.prototype.hasOwnProperty.call(changes, "shelfLocation")) {
+      const normalizedShelfLocation = normalizeStoredText(changes.shelfLocation);
+      updates.push(`shelfLocation = ${toSqlValue(normalizedShelfLocation)}`);
+    }
+
+    if (!updates.length) {
+      return;
+    }
+
+    await db.execAsync(`
+      UPDATE books
+      SET ${updates.join(", ")}
+      WHERE id IN (${bookIds});
     `);
   }
 

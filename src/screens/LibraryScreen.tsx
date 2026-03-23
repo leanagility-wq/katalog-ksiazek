@@ -26,7 +26,8 @@ interface LibraryScreenProps {
 }
 
 export function LibraryScreen({ onStartScan }: LibraryScreenProps) {
-  const { books, isLoading, errorMessage, saveBook } = useLibraryStore();
+  const { books, isLoading, errorMessage, saveBook, applyBatchUpdate } =
+    useLibraryStore();
   const { savedLocations } = useSettingsStore();
   const [sortKey, setSortKey] = useState<SortKey>("updated_desc");
   const [query, setQuery] = useState("");
@@ -201,22 +202,18 @@ export function LibraryScreen({ onStartScan }: LibraryScreenProps) {
   const applyBatchChanges = async (
     changes: Partial<Pick<Book, "status" | "shelfLocation">>
   ) => {
-    const selectedBooks = books.filter((book) => selectedBookIdSet.has(book.id));
+    const selectedIds = books
+      .filter((book) => selectedBookIdSet.has(book.id))
+      .map((book) => book.id);
 
-    if (!selectedBooks.length) {
+    if (!selectedIds.length) {
       return;
     }
 
     setIsApplyingBatch(true);
 
     try {
-      for (const book of selectedBooks) {
-        await saveBook({
-          ...book,
-          ...changes
-        });
-      }
-
+      await applyBatchUpdate(selectedIds, changes);
       clearSelection();
     } finally {
       setIsApplyingBatch(false);
