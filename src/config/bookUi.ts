@@ -10,6 +10,32 @@ export const STATUS_LABELS: Record<BookStatus, string> = {
   needs_review: "Do poprawy"
 };
 
+export const STATUS_STYLES: Record<
+  BookStatus,
+  { backgroundColor: string; textColor: string }
+> = {
+  available: {
+    backgroundColor: "#dfeeda",
+    textColor: "#2f6b31"
+  },
+  borrowed: {
+    backgroundColor: "#efe3cf",
+    textColor: "#7a5426"
+  },
+  for_sale: {
+    backgroundColor: "#dce8f7",
+    textColor: "#2d5d8b"
+  },
+  sold: {
+    backgroundColor: "#eadfd7",
+    textColor: "#6e5c4e"
+  },
+  needs_review: {
+    backgroundColor: "#f8ddce",
+    textColor: "#8a3c18"
+  }
+};
+
 export const STATUS_OPTIONS: Array<{ key: BookStatus; label: string }> = [
   { key: "available", label: STATUS_LABELS.available },
   { key: "borrowed", label: STATUS_LABELS.borrowed },

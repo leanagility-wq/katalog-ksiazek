@@ -1,6 +1,6 @@
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
-import { STATUS_LABELS } from "@/config/bookUi";
+import { STATUS_LABELS, STATUS_STYLES } from "@/config/bookUi";
 import { Book } from "@/types/book";
 
 interface BookListItemProps {
@@ -9,6 +9,8 @@ interface BookListItemProps {
 }
 
 export function BookListItem({ book, onPress }: BookListItemProps) {
+  const statusStyle = STATUS_STYLES[book.status];
+
   return (
     <Pressable
       onPress={onPress}
@@ -36,8 +38,15 @@ export function BookListItem({ book, onPress }: BookListItemProps) {
           </View>
         </View>
         <View style={styles.sideColumn}>
-          <View style={styles.badge}>
-            <Text style={styles.badgeText}>{STATUS_LABELS[book.status]}</Text>
+          <View
+            style={[
+              styles.badge,
+              { backgroundColor: statusStyle.backgroundColor }
+            ]}
+          >
+            <Text style={[styles.badgeText, { color: statusStyle.textColor }]}>
+              {STATUS_LABELS[book.status]}
+            </Text>
           </View>
           <Text style={styles.arrow}>{">"}</Text>
         </View>
@@ -68,7 +77,6 @@ const styles = StyleSheet.create({
     gap: 10
   },
   badge: {
-    backgroundColor: "#efe4ce",
     paddingHorizontal: 8,
     paddingVertical: 5,
     borderRadius: 999
@@ -76,8 +84,7 @@ const styles = StyleSheet.create({
   badgeText: {
     fontSize: 10,
     textTransform: "uppercase",
-    color: "#6d5636",
-    fontWeight: "700"
+    fontWeight: "800"
   },
   arrow: {
     fontSize: 20,

@@ -81,7 +81,11 @@ export function LibraryScreen({ onStartScan }: LibraryScreenProps) {
   }
 
   return (
-    <ScrollView contentContainerStyle={styles.content}>
+    <ScrollView
+      contentContainerStyle={styles.content}
+      stickyHeaderIndices={[1]}
+      keyboardShouldPersistTaps="handled"
+    >
       <SectionCard
         title={appText.library.title}
         subtitle={
@@ -90,14 +94,6 @@ export function LibraryScreen({ onStartScan }: LibraryScreenProps) {
             : appText.library.countLabel(books.length)
         }
       >
-        <TextInput
-          value={query}
-          onChangeText={setQuery}
-          placeholder={appText.library.searchPlaceholder}
-          placeholderTextColor="#9a8a76"
-          style={styles.searchInput}
-        />
-
         <View style={styles.actionsRow}>
           <View style={styles.action}>
             <PrimaryButton
@@ -118,47 +114,59 @@ export function LibraryScreen({ onStartScan }: LibraryScreenProps) {
         </View>
 
         {errorMessage ? <Text style={styles.error}>{errorMessage}</Text> : null}
-
-        <View style={styles.sortRow}>
-          {SORT_OPTIONS.map((option) => {
-            const isActive = option.key === sortKey;
-
-            return (
-              <Pressable
-                key={option.key}
-                onPress={() => setSortKey(option.key)}
-                style={[styles.sortChip, isActive ? styles.sortChipActive : null]}
-              >
-                <Text
-                  style={[
-                    styles.sortChipLabel,
-                    isActive ? styles.sortChipLabelActive : null
-                  ]}
-                >
-                  {option.label}
-                </Text>
-              </Pressable>
-            );
-          })}
-        </View>
-
-        <View style={styles.list}>
-          {visibleBooks.length ? (
-            visibleBooks.map((book) => (
-              <BookListItem
-                key={book.id}
-                book={book}
-                onPress={() => setSelectedBookId(book.id)}
-              />
-            ))
-          ) : (
-            <View style={styles.emptyState}>
-              <Text style={styles.emptyTitle}>{appText.library.emptyTitle}</Text>
-              <Text style={styles.emptyText}>{appText.library.emptyDescription}</Text>
-            </View>
-          )}
-        </View>
       </SectionCard>
+
+      <View style={styles.stickyWrap}>
+        <View style={styles.stickyBar}>
+          <TextInput
+            value={query}
+            onChangeText={setQuery}
+            placeholder={appText.library.searchPlaceholder}
+            placeholderTextColor="#9a8a76"
+            style={styles.searchInput}
+          />
+
+          <View style={styles.sortRow}>
+            {SORT_OPTIONS.map((option) => {
+              const isActive = option.key === sortKey;
+
+              return (
+                <Pressable
+                  key={option.key}
+                  onPress={() => setSortKey(option.key)}
+                  style={[styles.sortChip, isActive ? styles.sortChipActive : null]}
+                >
+                  <Text
+                    style={[
+                      styles.sortChipLabel,
+                      isActive ? styles.sortChipLabelActive : null
+                    ]}
+                  >
+                    {option.label}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+        </View>
+      </View>
+
+      <View style={styles.list}>
+        {visibleBooks.length ? (
+          visibleBooks.map((book) => (
+            <BookListItem
+              key={book.id}
+              book={book}
+              onPress={() => setSelectedBookId(book.id)}
+            />
+          ))
+        ) : (
+          <View style={styles.emptyState}>
+            <Text style={styles.emptyTitle}>{appText.library.emptyTitle}</Text>
+            <Text style={styles.emptyText}>{appText.library.emptyDescription}</Text>
+          </View>
+        )}
+      </View>
     </ScrollView>
   );
 }
@@ -168,7 +176,28 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingTop: 10,
     paddingBottom: 18,
-    gap: 12
+    gap: 10
+  },
+  actionsRow: {
+    flexDirection: "row",
+    gap: 8
+  },
+  action: {
+    flex: 1
+  },
+  stickyWrap: {
+    marginHorizontal: -16,
+    paddingHorizontal: 16,
+    paddingBottom: 2,
+    backgroundColor: "#f3efe7"
+  },
+  stickyBar: {
+    gap: 8,
+    padding: 10,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: "#e7dcc9",
+    backgroundColor: "#fffaf2"
   },
   searchInput: {
     minHeight: 42,
@@ -180,13 +209,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 10,
     fontSize: 14
-  },
-  actionsRow: {
-    flexDirection: "row",
-    gap: 8
-  },
-  action: {
-    flex: 1
   },
   sortRow: {
     flexDirection: "row",
