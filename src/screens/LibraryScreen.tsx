@@ -15,21 +15,39 @@ import { PrimaryButton } from "@/components/PrimaryButton";
 import { SectionCard } from "@/components/SectionCard";
 import { BookEditorScreen } from "@/screens/BookEditorScreen";
 import { useLibraryStore } from "@/store/useLibraryStore";
+import { Book, BookStatus } from "@/types/book";
+
+type QuickEditMode = "status" | "location" | null;
 
 interface LibraryScreenProps {
   onStartScan: () => void;
 }
 
 export function LibraryScreen({ onStartScan }: LibraryScreenProps) {
-  const { books, isLoading, errorMessage } = useLibraryStore();
+  const { books, isLoading, errorMessage, saveBook } = useLibraryStore();
   const [sortKey, setSortKey] = useState<SortKey>("updated_desc");
   const [query, setQuery] = useState("");
   const [selectedBookId, setSelectedBookId] = useState<string | null>(null);
   const [isCreating, setIsCreating] = useState(false);
+  const [quickEditBookId, setQuickEditBookId] = useState<string | null>(null);
+  const [quickEditMode, setQuickEditMode] = useState<QuickEditMode>(null);
+  const [updatingBookId, setUpdatingBookId] = useState<string | null>(null);
 
   const selectedBook = useMemo(
     () => books.find((book) => book.id === selectedBookId) ?? null,
     [books, selectedBookId]
+  );
+
+  const locationOptions = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          books
+            .map((book) => book.shelfLocation?.trim())
+            .filter((value): value is string => Boolean(value))
+        )
+      ).sort((left, right) => left.localeCompare(right, "pl")),
+    [books]
   );
 
   const visibleBooks = useMemo(() => {
@@ -68,6 +86,49 @@ export function LibraryScreen({ onStartScan }: LibraryScreenProps) {
   const closeEditor = () => {
     setSelectedBookId(null);
     setIsCreating(false);
+  };
+
+  const closeQuickEdit = () => {
+    setQuickEditBookId(null);
+    setQuickEditMode(null);
+  };
+
+  const handleQuickEditToggle = (bookId: string, mode: Exclude<QuickEditMode, null>) => {
+    if (quickEditBookId === bookId && quickEditMode === mode) {
+      closeQuickEdit();
+      return;
+    }
+
+    setQuickEditBookId(bookId);
+    setQuickEditMode(mode);
+  };
+
+  const updateBookQuickly = async (
+    book: Book,
+    changes: Partial<Pick<Book, "status" | "shelfLocation">>
+  ) => {
+    setUpdatingBookId(book.id);
+
+    try {
+      await saveBook({
+        ...book,
+        ...changes,
+        updatedAt: new Date().toISOString()
+      });
+      closeQuickEdit();
+    } finally {
+      setUpdatingBookId(null);
+    }
+  };
+
+  const handleQuickStatusSelect = async (book: Book, status: BookStatus) => {
+    await updateBookQuickly(book, { status });
+  };
+
+  const handleQuickLocationSave = async (book: Book, location?: string) => {
+    await updateBookQuickly(book, {
+      shelfLocation: location?.trim() || undefined
+    });
   };
 
   if (selectedBook || isCreating) {
@@ -158,6 +219,18 @@ export function LibraryScreen({ onStartScan }: LibraryScreenProps) {
               key={book.id}
               book={book}
               onPress={() => setSelectedBookId(book.id)}
+              quickEditMode={quickEditBookId === book.id ? quickEditMode : null}
+              isUpdating={updatingBookId === book.id}
+              locationOptions={locationOptions.filter(
+                (location) => location !== book.shelfLocation
+              )}
+              onToggleQuickEdit={(mode) => handleQuickEditToggle(book.id, mode)}
+              onQuickStatusSelect={(status) => {
+                void handleQuickStatusSelect(book, status);
+              }}
+              onQuickLocationSave={(location) => {
+                void handleQuickLocationSave(book, location);
+              }}
             />
           ))
         ) : (
