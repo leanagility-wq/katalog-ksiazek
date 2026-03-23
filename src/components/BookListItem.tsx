@@ -13,6 +13,7 @@ type QuickEditMode = "status" | "location" | null;
 
 interface BookListItemProps {
   book: Book;
+  isDuplicate?: boolean;
   onPress?: () => void;
   quickEditMode?: QuickEditMode;
   isUpdating?: boolean;
@@ -24,6 +25,7 @@ interface BookListItemProps {
 
 export function BookListItem({
   book,
+  isDuplicate = false,
   onPress,
   quickEditMode = null,
   isUpdating = false,
@@ -53,6 +55,11 @@ export function BookListItem({
             <Text numberOfLines={1} style={styles.meta}>
               {book.author || "Autor do uzupełnienia"}
             </Text>
+            {isDuplicate ? (
+              <View style={styles.duplicatePill}>
+                <Text style={styles.duplicatePillText}>Możliwy duplikat</Text>
+              </View>
+            ) : null}
             <View style={styles.metaRow}>
               <Pressable
                 onPress={() => onToggleQuickEdit("location")}
@@ -228,6 +235,18 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     flexWrap: "wrap",
     gap: 6
+  },
+  duplicatePill: {
+    alignSelf: "flex-start",
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 999,
+    backgroundColor: "#f8ddce"
+  },
+  duplicatePillText: {
+    color: "#8a3c18",
+    fontSize: 11,
+    fontWeight: "800"
   },
   metaPill: {
     paddingHorizontal: 8,

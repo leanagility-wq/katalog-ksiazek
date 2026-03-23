@@ -13,6 +13,7 @@ import { appText } from "@/config/uiText";
 import { BookListItem } from "@/components/BookListItem";
 import { PrimaryButton } from "@/components/PrimaryButton";
 import { SectionCard } from "@/components/SectionCard";
+import { collectDuplicateBookIds } from "@/features/catalog/duplicateDetection";
 import { BookEditorScreen } from "@/screens/BookEditorScreen";
 import { useLibraryStore } from "@/store/useLibraryStore";
 import { useSettingsStore } from "@/store/useSettingsStore";
@@ -51,6 +52,8 @@ export function LibraryScreen({ onStartScan }: LibraryScreenProps) {
       ).sort((left, right) => left.localeCompare(right, "pl")),
     [books, savedLocations]
   );
+
+  const duplicateBookIds = useMemo(() => collectDuplicateBookIds(books), [books]);
 
   const visibleBooks = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
@@ -223,6 +226,7 @@ export function LibraryScreen({ onStartScan }: LibraryScreenProps) {
             <BookListItem
               key={book.id}
               book={book}
+              isDuplicate={duplicateBookIds.has(book.id)}
               onPress={() => setSelectedBookId(book.id)}
               quickEditMode={quickEditBookId === book.id ? quickEditMode : null}
               isUpdating={updatingBookId === book.id}

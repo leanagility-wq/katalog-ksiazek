@@ -1,5 +1,9 @@
 import { create } from "zustand";
 
+import {
+  findDuplicateMatches,
+  getDuplicateErrorMessage
+} from "@/features/catalog/duplicateDetection";
 import { bookRepository } from "@/storage/bookRepository";
 import { Book } from "@/types/book";
 
@@ -42,6 +46,13 @@ export const useLibraryStore = create<LibraryState>((set) => ({
   },
   saveBook: async (book) => {
     try {
+      const existingBooks = await bookRepository.list();
+      const duplicateMatches = findDuplicateMatches(book, existingBooks, book.id);
+
+      if (duplicateMatches.length) {
+        throw new Error(getDuplicateErrorMessage(duplicateMatches));
+      }
+
       await bookRepository.save(book);
       const books = await bookRepository.list();
       set({ books, errorMessage: null });
