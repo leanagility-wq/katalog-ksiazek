@@ -8,6 +8,17 @@ export interface BookRepository {
   remove(id: string): Promise<void>;
 }
 
+async function executeWrite(source: string, ...params: Array<string | number | null>) {
+  const db = await getDatabase();
+  const statement = await db.prepareAsync(source);
+
+  try {
+    await statement.executeAsync(...params);
+  } finally {
+    await statement.finalizeAsync();
+  }
+}
+
 class SQLiteBookRepository implements BookRepository {
   async list() {
     const db = await getDatabase();
@@ -35,7 +46,6 @@ class SQLiteBookRepository implements BookRepository {
   }
 
   async save(book: Book) {
-    const db = await getDatabase();
     const normalizedBook: Book = {
       ...book,
       title: normalizeStoredText(book.title) ?? "",
@@ -48,7 +58,7 @@ class SQLiteBookRepository implements BookRepository {
       notes: normalizeStoredText(book.notes)
     };
 
-    await db.runAsync(
+    await executeWrite(
       `
         INSERT INTO books (
           id, title, author, isbn, shelfLocation, imageUri, ocrText,
@@ -69,27 +79,24 @@ class SQLiteBookRepository implements BookRepository {
           createdAt = excluded.createdAt,
           updatedAt = excluded.updatedAt
       `,
-      [
-        normalizedBook.id,
-        normalizedBook.title,
-        normalizedBook.author,
-        normalizedBook.isbn ?? null,
-        normalizedBook.shelfLocation ?? null,
-        normalizedBook.imageUri ?? null,
-        normalizedBook.ocrText,
-        normalizedBook.price ?? null,
-        normalizedBook.borrowedTo ?? null,
-        normalizedBook.notes ?? null,
-        normalizedBook.status,
-        normalizedBook.createdAt,
-        normalizedBook.updatedAt
-      ]
+      normalizedBook.id,
+      normalizedBook.title,
+      normalizedBook.author,
+      normalizedBook.isbn ?? null,
+      normalizedBook.shelfLocation ?? null,
+      normalizedBook.imageUri ?? null,
+      normalizedBook.ocrText,
+      normalizedBook.price ?? null,
+      normalizedBook.borrowedTo ?? null,
+      normalizedBook.notes ?? null,
+      normalizedBook.status,
+      normalizedBook.createdAt,
+      normalizedBook.updatedAt
     );
   }
 
   async remove(id: string) {
-    const db = await getDatabase();
-    await db.runAsync("DELETE FROM books WHERE id = ?", [id]);
+    await executeWrite("DELETE FROM books WHERE id = ?", id);
   }
 }
 

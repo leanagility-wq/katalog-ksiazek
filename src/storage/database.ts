@@ -26,6 +26,20 @@ async function createSchema(db: SQLiteDatabase) {
   `);
 }
 
+async function executeWrite(
+  db: SQLiteDatabase,
+  source: string,
+  ...params: Array<string | number | null>
+) {
+  const statement = await db.prepareAsync(source);
+
+  try {
+    await statement.executeAsync(...params);
+  } finally {
+    await statement.finalizeAsync();
+  }
+}
+
 async function seedDatabase(db: SQLiteDatabase) {
   const result = await db.getFirstAsync<{ count: number }>(
     "SELECT COUNT(*) as count FROM books"
@@ -36,7 +50,8 @@ async function seedDatabase(db: SQLiteDatabase) {
   }
 
   for (const book of mockBooks) {
-    await db.runAsync(
+    await executeWrite(
+      db,
       `
         INSERT INTO books (
           id, title, author, isbn, shelfLocation, imageUri, ocrText,
@@ -44,21 +59,19 @@ async function seedDatabase(db: SQLiteDatabase) {
         )
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `,
-      [
-        book.id,
-        book.title,
-        book.author,
-        book.isbn ?? null,
-        book.shelfLocation ?? null,
-        book.imageUri ?? null,
-        book.ocrText,
-        book.price ?? null,
-        book.borrowedTo ?? null,
-        book.notes ?? null,
-        book.status,
-        book.createdAt,
-        book.updatedAt
-      ]
+      book.id,
+      book.title,
+      book.author,
+      book.isbn ?? null,
+      book.shelfLocation ?? null,
+      book.imageUri ?? null,
+      book.ocrText,
+      book.price ?? null,
+      book.borrowedTo ?? null,
+      book.notes ?? null,
+      book.status,
+      book.createdAt,
+      book.updatedAt
     );
   }
 }
