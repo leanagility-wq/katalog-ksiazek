@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import {
   Pressable,
   ScrollView,
@@ -40,6 +40,7 @@ export function LibraryScreen({ onStartScan }: LibraryScreenProps) {
   const [batchLocationDraft, setBatchLocationDraft] = useState("");
   const [isApplyingBatch, setIsApplyingBatch] = useState(false);
   const [batchActionMessage, setBatchActionMessage] = useState<string | null>(null);
+  const selectedBookIdsRef = useRef<string[]>([]);
 
   const isSelectionMode = selectedBookIds.length > 0;
 
@@ -117,6 +118,7 @@ export function LibraryScreen({ onStartScan }: LibraryScreenProps) {
   };
 
   const clearSelection = () => {
+    selectedBookIdsRef.current = [];
     setSelectedBookIds([]);
     setBatchLocationDraft("");
     setBatchActionMessage(null);
@@ -141,19 +143,23 @@ export function LibraryScreen({ onStartScan }: LibraryScreenProps) {
 
   const enterSelectionMode = (bookId: string) => {
     closeQuickEdit();
+    selectedBookIdsRef.current = [bookId];
     setSelectedBookIds([bookId]);
   };
 
   const toggleSelection = (bookId: string) => {
-    setSelectedBookIds((current) =>
-      current.includes(bookId)
-        ? current.filter((id) => id !== bookId)
-        : [...current, bookId]
-    );
+    const nextSelection = selectedBookIdsRef.current.includes(bookId)
+      ? selectedBookIdsRef.current.filter((id) => id !== bookId)
+      : [...selectedBookIdsRef.current, bookId];
+
+    selectedBookIdsRef.current = nextSelection;
+    setSelectedBookIds(nextSelection);
   };
 
   const replaceSelection = (bookIds: string[]) => {
-    setSelectedBookIds(Array.from(new Set(bookIds)));
+    const nextSelection = Array.from(new Set(bookIds));
+    selectedBookIdsRef.current = nextSelection;
+    setSelectedBookIds(nextSelection);
   };
 
   const selectBooksWithoutLocation = () => {
@@ -205,9 +211,7 @@ export function LibraryScreen({ onStartScan }: LibraryScreenProps) {
     changes: Partial<Pick<Book, "status" | "shelfLocation">>,
     actionMessage: string
   ) => {
-    const selectedIds = books
-      .filter((book) => selectedBookIdSet.has(book.id))
-      .map((book) => book.id);
+    const selectedIds = [...selectedBookIdsRef.current];
 
     if (!selectedIds.length) {
       return;
