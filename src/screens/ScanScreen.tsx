@@ -2,6 +2,7 @@ import { useRef, useState } from "react";
 import { ScrollView, StyleSheet, Text, View } from "react-native";
 import { CameraView, useCameraPermissions } from "expo-camera";
 
+import { appText } from "@/config/uiText";
 import { PrimaryButton } from "@/components/PrimaryButton";
 import { SectionCard } from "@/components/SectionCard";
 import { scanShelfImage } from "@/features/scanning/ocrService";
@@ -22,12 +23,12 @@ export function ScanScreen({ onMockScanReady }: ScanScreenProps) {
 
   const handleCaptureAndScan = async () => {
     if (!cameraRef.current || !isCameraReady) {
-      setScanMessage("Kamera nie jest jeszcze gotowa do wykonania zdjęcia.");
+      setScanMessage(appText.scan.cameraNotReady);
       return;
     }
 
     setIsProcessing(true);
-    setScanMessage("Robię zdjęcie i analizuję 3–6 grzbietów z centralnej części kadru...");
+    setScanMessage(appText.scan.processing);
 
     try {
       const picture = await cameraRef.current.takePictureAsync({
@@ -35,24 +36,22 @@ export function ScanScreen({ onMockScanReady }: ScanScreenProps) {
       });
 
       if (!picture?.uri) {
-        setScanMessage("Nie udało się zapisać zdjęcia do analizy.");
+        setScanMessage(appText.scan.savePhotoError);
         return;
       }
 
       const session = await scanShelfImage(picture.uri);
       setScanMessage(
         session.source === "openai"
-          ? "OCR online zakończony. Przechodzę do przeglądu."
+          ? appText.scan.openAiSuccess
           : session.source === "camera"
-            ? "Używam lokalnego OCR jako fallbacku. Przechodzę do przeglądu."
-            : "Uruchomiłem awaryjny fallback z przykładowymi danymi."
+            ? appText.scan.localSuccess
+            : appText.scan.mockSuccess
       );
       onMockScanReady(session);
     } catch (error) {
       setScanMessage(
-        error instanceof Error
-          ? error.message
-          : "Nie udało się wykonać skanu."
+        error instanceof Error ? error.message : appText.scan.scanError
       );
     } finally {
       setIsProcessing(false);
@@ -61,10 +60,7 @@ export function ScanScreen({ onMockScanReady }: ScanScreenProps) {
 
   return (
     <ScrollView contentContainerStyle={styles.content}>
-      <SectionCard
-        title="Skanowanie"
-        subtitle="Najlepsze wyniki daje mały fragment półki: zwykle 3–6 grzbietów, ale przy cienkich książkach może być ich więcej."
-      >
+      <SectionCard title={appText.scan.title} subtitle={appText.scan.subtitle}>
         {permission?.granted ? (
           <View style={styles.cameraShell}>
             <CameraView
@@ -74,48 +70,49 @@ export function ScanScreen({ onMockScanReady }: ScanScreenProps) {
               ratio="16:9"
               onCameraReady={() => setIsCameraReady(true)}
               onMountError={(event) =>
-                setScanMessage(`Błąd kamery: ${event.message}`)
+                setScanMessage(appText.scan.cameraMountError(event.message))
               }
             />
           </View>
         ) : (
           <View style={styles.cameraFallback}>
-            <Text style={styles.fallbackTitle}>Kamera czeka na zgodę</Text>
+            <Text style={styles.fallbackTitle}>{appText.scan.permissionTitle}</Text>
             <Text style={styles.fallbackCopy}>
-              Przy pierwszym uruchomieniu aplikacja poprosi o dostęp do aparatu.
+              {appText.scan.permissionDescription}
             </Text>
             <PrimaryButton
-              label="Nadaj uprawnienia kamery"
+              label={appText.scan.permissionButton}
               onPress={() => void requestPermission()}
             />
           </View>
         )}
         <View style={styles.guideBox}>
-          <Text style={styles.guideTitle}>Celuj w środkowy obszar kadru</Text>
-          <Text style={styles.guideHint}>
-            Najlepiej, jeśli w jednym zdjęciu widzisz kilka wyraźnych grzbietów i niewiele tła po bokach. Cienkich książek może być więcej niż 5.
-          </Text>
+          <Text style={styles.guideTitle}>{appText.scan.guideTitle}</Text>
+          <Text style={styles.guideHint}>{appText.scan.guideDescription}</Text>
         </View>
         {scanMessage ? <Text style={styles.status}>{scanMessage}</Text> : null}
         <PrimaryButton
-          label={isProcessing ? "Przetwarzanie..." : "Zrób zdjęcie i skanuj"}
+          label={
+            isProcessing
+              ? appText.scan.processingButton
+              : appText.scan.captureButton
+          }
           onPress={() => void handleCaptureAndScan()}
           disabled={isProcessing || !permission?.granted}
         />
       </SectionCard>
 
       <SectionCard
-        title="Jak skanować"
-        subtitle="Tu naprawdę liczy się sposób robienia zdjęcia, nie tylko sam model OCR."
+        title={appText.scan.tipsTitle}
+        subtitle={appText.scan.tipsSubtitle}
       >
-        <Text style={styles.listItem}>1. Skanuj małe fragmenty półki, nie cały regał.</Text>
-        <Text style={styles.listItem}>2. Utrzymuj telefon równolegle do grzbietów książek.</Text>
-        <Text style={styles.listItem}>3. Unikaj odbić światła i cienia na lakierowanych okładkach.</Text>
-        <Text style={styles.listItem}>4. Jeśli jeden grzbiet jest węższy lub pionowy, zeskanuj go osobno.</Text>
+        {appText.scan.tips.map((tip) => (
+          <Text key={tip} style={styles.listItem}>
+            {tip}
+          </Text>
+        ))}
         <Text style={styles.listItem}>
-          {openAIApiKey
-            ? "Klucz API jest zapisany. Użyjemy mocniejszego OCR online."
-            : "Brak klucza API. Ustaw go w zakładce Ustawienia, żeby włączyć OCR online."}
+          {openAIApiKey ? appText.scan.apiKeyPresent : appText.scan.apiKeyMissing}
         </Text>
       </SectionCard>
     </ScrollView>

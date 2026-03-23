@@ -9,6 +9,8 @@ import {
   View
 } from "react-native";
 
+import { STATUS_OPTIONS } from "@/config/bookUi";
+import { appText } from "@/config/uiText";
 import { PrimaryButton } from "@/components/PrimaryButton";
 import { SectionCard } from "@/components/SectionCard";
 import {
@@ -38,14 +40,6 @@ interface BookEditorScreenProps {
   onBack: () => void;
   onSaved: () => void;
 }
-
-const STATUS_OPTIONS: Array<{ key: BookStatus; label: string }> = [
-  { key: "available", label: "Dostępna" },
-  { key: "borrowed", label: "Pożyczona" },
-  { key: "for_sale", label: "Na sprzedaż" },
-  { key: "sold", label: "Sprzedana" },
-  { key: "needs_review", label: "Do poprawy" }
-];
 
 function createId() {
   return `book-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -128,7 +122,7 @@ export function BookEditorScreen({
   }, [book]);
 
   const screenTitle = useMemo(
-    () => (book ? "Edytuj książkę" : "Dodaj książkę"),
+    () => (book ? appText.editor.editTitle : appText.editor.createTitle),
     [book]
   );
 
@@ -151,11 +145,11 @@ export function BookEditorScreen({
       setSearchResults(results);
 
       if (!results.length) {
-        setSearchError("Nie znaleziono podobnych tytułów.");
+        setSearchError(appText.editor.noResults);
       }
     } catch (error) {
       setSearchError(
-        error instanceof Error ? error.message : "Nie udało się pobrać wyników."
+        error instanceof Error ? error.message : appText.editor.fetchError
       );
       setSearchResults([]);
     } finally {
@@ -174,7 +168,10 @@ export function BookEditorScreen({
 
   const handleSave = async () => {
     if (!draft.title.trim()) {
-      Alert.alert("Brakuje tytułu", "Uzupełnij tytuł przed zapisem.");
+      Alert.alert(
+        appText.editor.missingTitleAlertTitle,
+        appText.editor.missingTitleAlertDescription
+      );
       return;
     }
 
@@ -185,8 +182,8 @@ export function BookEditorScreen({
       onSaved();
     } catch (error) {
       Alert.alert(
-        "Nie udało się zapisać książki",
-        error instanceof Error ? error.message : "Spróbuj ponownie."
+        appText.editor.saveErrorTitle,
+        error instanceof Error ? error.message : appText.editor.retryLabel
       );
     } finally {
       setIsSaving(false);
@@ -199,39 +196,40 @@ export function BookEditorScreen({
       return;
     }
 
-    Alert.alert("Usunąć książkę?", "Ta operacja usunie wpis z katalogu.", [
-      { text: "Anuluj", style: "cancel" },
-      {
-        text: "Usuń",
-        style: "destructive",
-        onPress: async () => {
-          setIsDeleting(true);
+    Alert.alert(
+      appText.editor.deleteConfirmTitle,
+      appText.editor.deleteConfirmDescription,
+      [
+        { text: appText.editor.cancelButton, style: "cancel" },
+        {
+          text: appText.editor.deleteButton,
+          style: "destructive",
+          onPress: async () => {
+            setIsDeleting(true);
 
-          try {
-            await deleteBook(book.id);
-            onSaved();
-          } catch (error) {
-            Alert.alert(
-              "Nie udało się usunąć książki",
-              error instanceof Error ? error.message : "Spróbuj ponownie."
-            );
-          } finally {
-            setIsDeleting(false);
+            try {
+              await deleteBook(book.id);
+              onSaved();
+            } catch (error) {
+              Alert.alert(
+                appText.editor.deleteErrorTitle,
+                error instanceof Error ? error.message : appText.editor.retryLabel
+              );
+            } finally {
+              setIsDeleting(false);
+            }
           }
         }
-      }
-    ]);
+      ]
+    );
   };
 
   return (
     <ScrollView contentContainerStyle={styles.content}>
-      <SectionCard
-        title={screenTitle}
-        subtitle="Uzupełnij dane ręcznie albo podpowiedz je wyszukiwaniem online."
-      >
+      <SectionCard title={screenTitle} subtitle={appText.editor.subtitle}>
         <View style={styles.topActions}>
           <Pressable onPress={onBack} style={styles.secondaryButton}>
-            <Text style={styles.secondaryButtonLabel}>Wróć</Text>
+            <Text style={styles.secondaryButtonLabel}>{appText.editor.backButton}</Text>
           </Pressable>
           <Pressable
             onPress={handleDelete}
@@ -241,27 +239,35 @@ export function BookEditorScreen({
             <Text
               style={[styles.secondaryButtonLabel, styles.dangerButtonLabel]}
             >
-              {book ? (isDeleting ? "Usuwanie..." : "Usuń") : "Anuluj"}
+              {book
+                ? isDeleting
+                  ? appText.editor.deletingButton
+                  : appText.editor.deleteButton
+                : appText.editor.cancelButton}
             </Text>
           </Pressable>
         </View>
 
         <View style={styles.form}>
           <Field
-            label="Tytuł"
+            label={appText.editor.fields.title}
             value={draft.title}
             onChangeText={(value) => updateDraft("title", value)}
-            placeholder="Np. Lalka"
+            placeholder={appText.editor.fields.titlePlaceholder}
           />
           <Field
-            label="Autor"
+            label={appText.editor.fields.author}
             value={draft.author}
             onChangeText={(value) => updateDraft("author", value)}
-            placeholder="Np. Bolesław Prus"
+            placeholder={appText.editor.fields.authorPlaceholder}
           />
           <View style={styles.inlineActions}>
             <PrimaryButton
-              label={isSearching ? "Szukam..." : "Wyszukaj w sieci"}
+              label={
+                isSearching
+                  ? appText.editor.searchingButton
+                  : appText.editor.searchButton
+              }
               onPress={() => {
                 void handleSearch();
               }}
@@ -281,8 +287,8 @@ export function BookEditorScreen({
                   <Text style={styles.resultMeta}>{result.author}</Text>
                   <Text style={styles.resultMeta}>
                     {result.publishYear
-                      ? `Pierwsze wydanie: ${result.publishYear}`
-                      : "Rok wydania nieznany"}
+                      ? appText.editor.firstEditionLabel(result.publishYear)
+                      : appText.editor.unknownEditionLabel}
                   </Text>
                 </Pressable>
               ))}
@@ -290,46 +296,46 @@ export function BookEditorScreen({
           ) : null}
 
           <Field
-            label="ISBN"
+            label={appText.editor.fields.isbn}
             value={draft.isbn}
             onChangeText={(value) => updateDraft("isbn", value)}
-            placeholder="Opcjonalnie"
+            placeholder={appText.editor.fields.optionalPlaceholder}
           />
           <Field
-            label="Lokalizacja"
+            label={appText.editor.fields.location}
             value={draft.shelfLocation}
             onChangeText={(value) => updateDraft("shelfLocation", value)}
-            placeholder="Np. Salon / Półka A"
+            placeholder={appText.editor.fields.locationPlaceholder}
           />
           <Field
-            label="Cena"
+            label={appText.editor.fields.price}
             value={draft.price}
             onChangeText={(value) => updateDraft("price", value)}
-            placeholder="Np. 24.99"
+            placeholder={appText.editor.fields.pricePlaceholder}
             keyboardType="decimal-pad"
           />
           <Field
-            label="Pożyczona komu"
+            label={appText.editor.fields.borrowedTo}
             value={draft.borrowedTo}
             onChangeText={(value) => updateDraft("borrowedTo", value)}
-            placeholder="Opcjonalnie"
+            placeholder={appText.editor.fields.optionalPlaceholder}
           />
           <Field
-            label="OCR / tekst z grzbietu"
+            label={appText.editor.fields.ocrText}
             value={draft.ocrText}
             onChangeText={(value) => updateDraft("ocrText", value)}
-            placeholder="Surowy tekst ze skanu"
+            placeholder={appText.editor.fields.ocrTextPlaceholder}
             multiline
           />
           <Field
-            label="Notatki"
+            label={appText.editor.fields.notes}
             value={draft.notes}
             onChangeText={(value) => updateDraft("notes", value)}
-            placeholder="Stan, uwagi, komplet serii..."
+            placeholder={appText.editor.fields.notesPlaceholder}
             multiline
           />
           <View style={styles.statusBlock}>
-            <Text style={styles.fieldLabel}>Status</Text>
+            <Text style={styles.fieldLabel}>{appText.editor.fields.status}</Text>
             <View style={styles.statusOptions}>
               {STATUS_OPTIONS.map((option) => {
                 const isActive = draft.status === option.key;
@@ -358,7 +364,9 @@ export function BookEditorScreen({
           </View>
 
           <PrimaryButton
-            label={isSaving ? "Zapisywanie..." : "Zapisz w katalogu"}
+            label={
+              isSaving ? appText.editor.savingButton : appText.editor.saveButton
+            }
             onPress={() => {
               void handleSave();
             }}

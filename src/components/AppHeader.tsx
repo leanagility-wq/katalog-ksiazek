@@ -1,10 +1,12 @@
 import { StyleSheet, Text, View } from "react-native";
 
+import { appText } from "@/config/uiText";
+
 export function AppHeader() {
   return (
     <View style={styles.header}>
-      <Text style={styles.eyebrow}>Domowa biblioteka</Text>
-      <Text style={styles.title}>Katalog książek</Text>
+      <Text style={styles.eyebrow}>{appText.header.eyebrow}</Text>
+      <Text style={styles.title}>{appText.header.title}</Text>
     </View>
   );
 }

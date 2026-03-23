@@ -1,23 +1,12 @@
 import { Book } from "@/types/book";
 import { getDatabase } from "@/storage/database";
 import { normalizeStoredText } from "@/utils/text";
+import { toSqlValue } from "@/utils/sql";
 
 export interface BookRepository {
   list(): Promise<Book[]>;
   save(book: Book): Promise<void>;
   remove(id: string): Promise<void>;
-}
-
-function toSqlValue(value: string | number | null | undefined) {
-  if (value == null) {
-    return "NULL";
-  }
-
-  if (typeof value === "number") {
-    return Number.isFinite(value) ? String(value) : "NULL";
-  }
-
-  return `'${value.replace(/'/g, "''")}'`;
 }
 
 class SQLiteBookRepository implements BookRepository {

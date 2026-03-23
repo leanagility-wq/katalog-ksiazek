@@ -8,24 +8,17 @@ import {
   View
 } from "react-native";
 
+import { SORT_OPTIONS, SortKey } from "@/config/bookUi";
+import { appText } from "@/config/uiText";
 import { BookListItem } from "@/components/BookListItem";
 import { PrimaryButton } from "@/components/PrimaryButton";
 import { SectionCard } from "@/components/SectionCard";
 import { BookEditorScreen } from "@/screens/BookEditorScreen";
 import { useLibraryStore } from "@/store/useLibraryStore";
 
-type SortKey = "updated_desc" | "title_asc" | "author_asc" | "status_asc";
-
 interface LibraryScreenProps {
   onStartScan: () => void;
 }
-
-const SORT_OPTIONS: Array<{ key: SortKey; label: string }> = [
-  { key: "updated_desc", label: "Ostatnio zmienione" },
-  { key: "title_asc", label: "Tytuł A-Z" },
-  { key: "author_asc", label: "Autor A-Z" },
-  { key: "status_asc", label: "Status" }
-];
 
 export function LibraryScreen({ onStartScan }: LibraryScreenProps) {
   const { books, isLoading, errorMessage } = useLibraryStore();
@@ -90,18 +83,23 @@ export function LibraryScreen({ onStartScan }: LibraryScreenProps) {
   return (
     <ScrollView contentContainerStyle={styles.content}>
       <SectionCard
-        title="Katalog"
+        title={appText.library.title}
         subtitle={
-          isLoading ? "Ładowanie biblioteki..." : `Pozycji w katalogu: ${books.length}`
+          isLoading
+            ? appText.library.loading
+            : appText.library.countLabel(books.length)
         }
       >
         <View style={styles.heroActions}>
           <View style={styles.heroAction}>
-            <PrimaryButton label="Zeskanuj nową półkę" onPress={onStartScan} />
+            <PrimaryButton
+              label={appText.library.scanButton}
+              onPress={onStartScan}
+            />
           </View>
           <View style={styles.heroAction}>
             <PrimaryButton
-              label="Dodaj ręcznie"
+              label={appText.library.addManualButton}
               onPress={() => {
                 setIsCreating(true);
               }}
@@ -112,13 +110,13 @@ export function LibraryScreen({ onStartScan }: LibraryScreenProps) {
       </SectionCard>
 
       <SectionCard
-        title="Przeglądaj i poprawiaj"
-        subtitle="Otwórz książkę, aby dopisać dane, wyszukać metadane online albo usunąć wpis."
+        title={appText.library.browseTitle}
+        subtitle={appText.library.browseSubtitle}
       >
         <TextInput
           value={query}
           onChangeText={setQuery}
-          placeholder="Szukaj po tytule, autorze, ISBN albo lokalizacji"
+          placeholder={appText.library.searchPlaceholder}
           placeholderTextColor="#9a8a76"
           style={styles.searchInput}
         />
@@ -155,31 +153,22 @@ export function LibraryScreen({ onStartScan }: LibraryScreenProps) {
             ))
           ) : (
             <View style={styles.emptyState}>
-              <Text style={styles.emptyTitle}>Nie ma jeszcze pasujących książek.</Text>
-              <Text style={styles.emptyText}>
-                Zeskanuj półkę albo dodaj tytuł ręcznie, a potem uzupełnij
-                szczegóły z sieci.
-              </Text>
+              <Text style={styles.emptyTitle}>{appText.library.emptyTitle}</Text>
+              <Text style={styles.emptyText}>{appText.library.emptyDescription}</Text>
             </View>
           )}
         </View>
       </SectionCard>
 
       <SectionCard
-        title="Jak to działa"
-        subtitle="Najwygodniejszy sposób pracy z katalogiem na telefonie."
+        title={appText.library.guideTitle}
+        subtitle={appText.library.guideSubtitle}
       >
-        <Text style={styles.listItem}>1. Zeskanuj półkę albo dodaj książkę ręcznie.</Text>
-        <Text style={styles.listItem}>
-          2. Otwórz wpis i popraw tytuł, autora, lokalizację albo status.
-        </Text>
-        <Text style={styles.listItem}>
-          3. Użyj przycisku "Wyszukaj w sieci", gdy chcesz dobrać ISBN lub lepsze
-          metadane.
-        </Text>
-        <Text style={styles.listItem}>
-          4. W razie potrzeby usuń wpis jednym przyciskiem z poziomu edycji.
-        </Text>
+        {appText.library.guideSteps.map((step) => (
+          <Text key={step} style={styles.listItem}>
+            {step}
+          </Text>
+        ))}
       </SectionCard>
     </ScrollView>
   );

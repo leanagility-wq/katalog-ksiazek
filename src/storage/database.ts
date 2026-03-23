@@ -1,22 +1,11 @@
 import { SQLiteDatabase, openDatabaseAsync } from "expo-sqlite";
 
 import { mockBooks } from "@/data/mockBooks";
+import { toSqlValue } from "@/utils/sql";
 
 const DATABASE_NAME = "library.db";
 
 let databasePromise: Promise<SQLiteDatabase> | null = null;
-
-function toSqlValue(value: string | number | null | undefined) {
-  if (value == null) {
-    return "NULL";
-  }
-
-  if (typeof value === "number") {
-    return Number.isFinite(value) ? String(value) : "NULL";
-  }
-
-  return `'${value.replace(/'/g, "''")}'`;
-}
 
 async function createSchema(db: SQLiteDatabase) {
   await db.execAsync(`

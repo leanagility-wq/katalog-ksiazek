@@ -1,19 +1,12 @@
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
+import { STATUS_LABELS } from "@/config/bookUi";
 import { Book } from "@/types/book";
 
 interface BookListItemProps {
   book: Book;
   onPress?: () => void;
 }
-
-const STATUS_LABELS: Record<Book["status"], string> = {
-  available: "Dostępna",
-  borrowed: "Pożyczona",
-  for_sale: "Na sprzedaż",
-  sold: "Sprzedana",
-  needs_review: "Do poprawy"
-};
 
 export function BookListItem({ book, onPress }: BookListItemProps) {
   return (

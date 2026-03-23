@@ -1,20 +1,14 @@
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { appText } from "@/config/uiText";
+
 export type TabKey = "library" | "scan" | "review" | "export" | "settings";
 
 interface TabBarProps {
   activeTab: TabKey;
   onChange: (tab: TabKey) => void;
 }
-
-const tabs: { key: TabKey; label: string }[] = [
-  { key: "library", label: "Katalog" },
-  { key: "scan", label: "Skan" },
-  { key: "review", label: "Przegl\u0105d" },
-  { key: "export", label: "Eksport" },
-  { key: "settings", label: "Ustawienia" }
-];
 
 export function TabBar({ activeTab, onChange }: TabBarProps) {
   const insets = useSafeAreaInsets();
@@ -27,7 +21,7 @@ export function TabBar({ activeTab, onChange }: TabBarProps) {
       ]}
     >
       <View style={styles.bar}>
-        {tabs.map((tab) => {
+        {appText.tabs.map((tab) => {
           const isActive = activeTab === tab.key;
 
           return (

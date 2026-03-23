@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 
+import { appText } from "@/config/uiText";
 import { PrimaryButton } from "@/components/PrimaryButton";
 import { SectionCard } from "@/components/SectionCard";
 import { mapCandidateToBook } from "@/features/scanning/scanMapper";
@@ -25,18 +26,20 @@ interface ReviewScreenProps {
 
 function confidenceLabel(confidence?: number) {
   if (confidence == null) {
-    return "Brak oceny";
+    return appText.review.noScore;
   }
 
+  const roundedConfidence = Math.round(confidence * 100);
+
   if (confidence >= 0.82) {
-    return `Wysoka pewność (${Math.round(confidence * 100)}%)`;
+    return appText.review.confidenceHigh(roundedConfidence);
   }
 
   if (confidence >= 0.6) {
-    return `Średnia pewność (${Math.round(confidence * 100)}%)`;
+    return appText.review.confidenceMedium(roundedConfidence);
   }
 
-  return `Niska pewność (${Math.round(confidence * 100)}%)`;
+  return appText.review.confidenceLow(roundedConfidence);
 }
 
 export function ReviewScreen({
@@ -107,7 +110,7 @@ export function ReviewScreen({
       onComplete();
     } catch (error) {
       setSaveError(
-        error instanceof Error ? error.message : "Nie udało się zapisać książek."
+        error instanceof Error ? error.message : appText.review.saveError
       );
     } finally {
       setIsSaving(false);
@@ -118,12 +121,10 @@ export function ReviewScreen({
     return (
       <ScrollView contentContainerStyle={styles.content}>
         <SectionCard
-          title={"Przegląd OCR"}
-          subtitle={
-            "Nie ma jeszcze aktywnego skanu. Najpierw przejdź do ekranu skanowania."
-          }
+          title={appText.review.title}
+          subtitle={appText.review.noScanSubtitle}
         >
-          <PrimaryButton label={"Wróć do skanowania"} onPress={onCancel} />
+          <PrimaryButton label={appText.review.backToScan} onPress={onCancel} />
         </SectionCard>
       </ScrollView>
     );
@@ -132,18 +133,15 @@ export function ReviewScreen({
   return (
     <ScrollView contentContainerStyle={styles.content}>
       <SectionCard
-        title={"Przegląd OCR"}
-        subtitle={`Skan: ${scanSession.imageLabel}. Rozpoznane pozycje: ${items.length}`}
+        title={appText.review.title}
+        subtitle={appText.review.subtitle(scanSession.imageLabel, items.length)}
       >
-        <Text style={styles.helper}>
-          Sprawdź przede wszystkim wpisy oznaczone do uwagi. To one najczęściej
-          wymagają ręcznej korekty.
-        </Text>
+        <Text style={styles.helper}>{appText.review.helper}</Text>
         <Text style={styles.summary}>
-          Wymaga uwagi: {attentionCount} z {items.length}
+          {appText.review.summary(attentionCount, items.length)}
         </Text>
         {scanSession.imageUri ? (
-          <Text style={styles.meta}>{`Źródło obrazu: ${scanSession.imageUri}`}</Text>
+          <Text style={styles.meta}>{appText.review.imageSource(scanSession.imageUri)}</Text>
         ) : null}
         {saveError ? <Text style={styles.error}>{saveError}</Text> : null}
       </SectionCard>
@@ -151,8 +149,8 @@ export function ReviewScreen({
       {items.map((item, index) => (
         <SectionCard
           key={item.id}
-          title={`Pozycja ${index + 1}`}
-          subtitle={`Surowy OCR: ${item.rawText || "brak"}`}
+          title={appText.review.positionTitle(index)}
+          subtitle={appText.review.rawOcr(item.rawText)}
         >
           <View style={styles.badgeRow}>
             <View
@@ -167,7 +165,9 @@ export function ReviewScreen({
                   item.needsAttention ? styles.badgeWarningText : styles.badgeOkText
                 ]}
               >
-                {item.needsAttention ? "Sprawdź ręcznie" : "Wygląda dobrze"}
+                {item.needsAttention
+                  ? appText.review.needsAttention
+                  : appText.review.looksGood}
               </Text>
             </View>
             <Text style={styles.confidence}>{confidenceLabel(item.confidence)}</Text>
@@ -176,22 +176,22 @@ export function ReviewScreen({
             <Text style={styles.reviewReason}>{item.reviewReason}</Text>
           ) : null}
           <View style={styles.field}>
-            <Text style={styles.label}>Tytuł</Text>
+            <Text style={styles.label}>{appText.review.titleField}</Text>
             <TextInput
               value={item.titleSuggestion}
               onChangeText={(value) => handleChange(item.id, "titleSuggestion", value)}
               style={styles.input}
-              placeholder={"Tytuł książki"}
+              placeholder={appText.review.titlePlaceholder}
               placeholderTextColor="#9a8a76"
             />
           </View>
           <View style={styles.field}>
-            <Text style={styles.label}>Autor</Text>
+            <Text style={styles.label}>{appText.review.authorField}</Text>
             <TextInput
               value={item.authorSuggestion}
               onChangeText={(value) => handleChange(item.id, "authorSuggestion", value)}
               style={styles.input}
-              placeholder={"Autor"}
+              placeholder={appText.review.authorPlaceholder}
               placeholderTextColor="#9a8a76"
             />
           </View>
@@ -199,9 +199,9 @@ export function ReviewScreen({
       ))}
 
       <View style={styles.actions}>
-        <PrimaryButton label={"Wróć do skanu"} onPress={onCancel} />
+        <PrimaryButton label={appText.review.backToScanShort} onPress={onCancel} />
         <PrimaryButton
-          label={isSaving ? "Zapisywanie..." : "Zapisz w katalogu"}
+          label={isSaving ? appText.review.savingButton : appText.review.saveButton}
           onPress={() => void handleSave()}
           disabled={isSaving || items.length === 0}
         />

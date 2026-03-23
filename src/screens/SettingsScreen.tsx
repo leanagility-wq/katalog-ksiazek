@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 
+import { appText } from "@/config/uiText";
 import { PrimaryButton } from "@/components/PrimaryButton";
 import { SectionCard } from "@/components/SectionCard";
 import { useSettingsStore } from "@/store/useSettingsStore";
@@ -30,23 +31,23 @@ export function SettingsScreen() {
 
   const handleSave = async () => {
     await saveOpenAIApiKey(draftApiKey);
-    setInfoMessage("Klucz API zapisany lokalnie w SecureStore.");
+    setInfoMessage(appText.settings.savedInfo);
   };
 
   const handleClear = async () => {
     await clearOpenAIApiKey();
     setDraftApiKey("");
-    setInfoMessage("Klucz API został usunięty z urządzenia.");
+    setInfoMessage(appText.settings.clearedInfo);
   };
 
   return (
     <ScrollView contentContainerStyle={styles.content}>
       <SectionCard
-        title="OCR online"
-        subtitle="Tutaj podajesz własny klucz OpenAI API. Klucz jest trzymany lokalnie na telefonie, a nie w kodzie aplikacji."
+        title={appText.settings.title}
+        subtitle={appText.settings.subtitle}
       >
         <View style={styles.field}>
-          <Text style={styles.label}>OpenAI API key</Text>
+          <Text style={styles.label}>{appText.settings.inputLabel}</Text>
           <TextInput
             value={draftApiKey}
             onChangeText={setDraftApiKey}
@@ -57,19 +58,23 @@ export function SettingsScreen() {
             secureTextEntry
           />
         </View>
-        <Text style={styles.helper}>
-          Po zapisaniu skan wyśle zdjęcie półki do modelu wizji i zwróci listę rozpoznanych książek do korekty.
-        </Text>
+        <Text style={styles.helper}>{appText.settings.helper}</Text>
         {errorMessage ? <Text style={styles.error}>{errorMessage}</Text> : null}
         {infoMessage ? <Text style={styles.info}>{infoMessage}</Text> : null}
         <View style={styles.actions}>
           <PrimaryButton
-            label={isSaving ? "Zapisywanie..." : "Zapisz klucz API"}
+            label={
+              isSaving
+                ? appText.settings.savingButton
+                : appText.settings.saveButton
+            }
             onPress={() => void handleSave()}
             disabled={isSaving || draftApiKey.trim().length === 0}
           />
           <PrimaryButton
-            label={isSaving ? "Pracuję..." : "Usuń klucz z telefonu"}
+            label={
+              isSaving ? appText.settings.busyButton : appText.settings.clearButton
+            }
             onPress={() => void handleClear()}
             disabled={isSaving || openAIApiKey.length === 0}
           />
