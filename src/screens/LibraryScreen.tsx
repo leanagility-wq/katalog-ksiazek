@@ -1,7 +1,8 @@
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
+  FlatList,
+  ListRenderItemInfo,
   Pressable,
-  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -20,6 +21,7 @@ import { useSettingsStore } from "@/store/useSettingsStore";
 import { Book, BookStatus } from "@/types/book";
 
 type QuickEditMode = "status" | "location" | null;
+const CATALOG_PAGE_SIZE = 40;
 
 interface LibraryScreenProps {
   onStartScan: () => void;
@@ -40,6 +42,7 @@ export function LibraryScreen({ onStartScan }: LibraryScreenProps) {
   const [batchLocationDraft, setBatchLocationDraft] = useState("");
   const [isApplyingBatch, setIsApplyingBatch] = useState(false);
   const [batchActionMessage, setBatchActionMessage] = useState<string | null>(null);
+  const [renderLimit, setRenderLimit] = useState(CATALOG_PAGE_SIZE);
   const selectedBookIdsRef = useRef<string[]>([]);
 
   const isSelectionMode = selectedBookIds.length > 0;
@@ -106,6 +109,17 @@ export function LibraryScreen({ onStartScan }: LibraryScreenProps) {
     () => visibleBooks.filter((book) => book.status === "needs_review").length,
     [visibleBooks]
   );
+
+  const renderedBooks = useMemo(
+    () => visibleBooks.slice(0, renderLimit),
+    [renderLimit, visibleBooks]
+  );
+
+  const canLoadMoreBooks = renderLimit < visibleBooks.length;
+
+  useEffect(() => {
+    setRenderLimit(CATALOG_PAGE_SIZE);
+  }, [query, sortKey, books.length]);
 
   const closeEditor = () => {
     setSelectedBookId(null);
@@ -252,6 +266,16 @@ export function LibraryScreen({ onStartScan }: LibraryScreenProps) {
     );
   };
 
+  const handleLoadMoreBooks = () => {
+    if (!canLoadMoreBooks) {
+      return;
+    }
+
+    setRenderLimit((current) =>
+      Math.min(current + CATALOG_PAGE_SIZE, visibleBooks.length)
+    );
+  };
+
   if (selectedBook || isCreating) {
     return (
       <BookEditorScreen
@@ -262,12 +286,35 @@ export function LibraryScreen({ onStartScan }: LibraryScreenProps) {
     );
   }
 
-  return (
-    <ScrollView
-      contentContainerStyle={styles.content}
-      stickyHeaderIndices={[1]}
-      keyboardShouldPersistTaps="handled"
-    >
+  const renderBookItem = ({ item }: ListRenderItemInfo<Book>) => (
+    <BookListItem
+      key={item.id}
+      book={item}
+      isDuplicate={duplicateBookIds.has(item.id)}
+      isSelectable={isSelectionMode}
+      isSelected={selectedBookIdSet.has(item.id)}
+      onPress={() => setSelectedBookId(item.id)}
+      onTitleLongPress={() => enterSelectionMode(item.id)}
+      onToggleSelection={() => toggleSelection(item.id)}
+      quickEditMode={
+        !isSelectionMode && quickEditBookId === item.id ? quickEditMode : null
+      }
+      isUpdating={updatingBookId === item.id}
+      locationOptions={locationOptions.filter(
+        (location) => location !== item.shelfLocation
+      )}
+      onToggleQuickEdit={(mode) => handleQuickEditToggle(item.id, mode)}
+      onQuickStatusSelect={(status) => {
+        void handleQuickStatusSelect(item, status);
+      }}
+      onQuickLocationSave={(location) => {
+        void handleQuickLocationSave(item, location);
+      }}
+    />
+  );
+
+  const renderListHeader = () => (
+    <View style={styles.headerContent}>
       <SectionCard
         title={appText.library.title}
         subtitle={
@@ -301,7 +348,7 @@ export function LibraryScreen({ onStartScan }: LibraryScreenProps) {
         ) : null}
       </SectionCard>
 
-      <View style={styles.stickyWrap}>
+      <View style={styles.controlsWrap}>
         <View style={styles.stickyBar}>
           <TextInput
             value={query}
@@ -351,6 +398,15 @@ export function LibraryScreen({ onStartScan }: LibraryScreenProps) {
                 {appText.library.visibleNeedsReviewLabel(visibleNeedsReviewCount)}
               </Text>
             </View>
+          </View>
+
+          <View style={styles.lazyInfoRow}>
+            <Text style={styles.lazyInfoLabel}>
+              {appText.library.lazyLoadedCount(
+                renderedBooks.length,
+                visibleBooks.length
+              )}
+            </Text>
           </View>
 
           {isSelectionMode ? (
@@ -500,43 +556,40 @@ export function LibraryScreen({ onStartScan }: LibraryScreenProps) {
           ) : null}
         </View>
       </View>
+    </View>
+  );
 
-      <View style={styles.list}>
-        {visibleBooks.length ? (
-          visibleBooks.map((book) => (
-            <BookListItem
-              key={book.id}
-              book={book}
-              isDuplicate={duplicateBookIds.has(book.id)}
-              isSelectable={isSelectionMode}
-              isSelected={selectedBookIdSet.has(book.id)}
-              onPress={() => setSelectedBookId(book.id)}
-              onTitleLongPress={() => enterSelectionMode(book.id)}
-              onToggleSelection={() => toggleSelection(book.id)}
-              quickEditMode={
-                !isSelectionMode && quickEditBookId === book.id ? quickEditMode : null
-              }
-              isUpdating={updatingBookId === book.id}
-              locationOptions={locationOptions.filter(
-                (location) => location !== book.shelfLocation
-              )}
-              onToggleQuickEdit={(mode) => handleQuickEditToggle(book.id, mode)}
-              onQuickStatusSelect={(status) => {
-                void handleQuickStatusSelect(book, status);
-              }}
-              onQuickLocationSave={(location) => {
-                void handleQuickLocationSave(book, location);
-              }}
-            />
-          ))
-        ) : (
-          <View style={styles.emptyState}>
-            <Text style={styles.emptyTitle}>{appText.library.emptyTitle}</Text>
-            <Text style={styles.emptyText}>{appText.library.emptyDescription}</Text>
+  return (
+    <FlatList
+      data={renderedBooks}
+      keyExtractor={(item) => item.id}
+      renderItem={renderBookItem}
+      ListHeaderComponent={renderListHeader}
+      ListEmptyComponent={
+        <View style={styles.emptyState}>
+          <Text style={styles.emptyTitle}>{appText.library.emptyTitle}</Text>
+          <Text style={styles.emptyText}>{appText.library.emptyDescription}</Text>
+        </View>
+      }
+      ListFooterComponent={
+        canLoadMoreBooks ? (
+          <View style={styles.footerLoader}>
+            <Text style={styles.footerLoaderLabel}>
+              {appText.library.lazyLoadingMore}
+            </Text>
           </View>
-        )}
-      </View>
-    </ScrollView>
+        ) : null
+      }
+      onEndReached={handleLoadMoreBooks}
+      onEndReachedThreshold={0.35}
+      initialNumToRender={12}
+      maxToRenderPerBatch={12}
+      windowSize={7}
+      removeClippedSubviews
+      keyboardShouldPersistTaps="handled"
+      contentContainerStyle={styles.content}
+      ItemSeparatorComponent={() => <View style={styles.separator} />}
+    />
   );
 }
 
@@ -545,6 +598,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingTop: 10,
     paddingBottom: 18,
+    gap: 10
+  },
+  headerContent: {
     gap: 10
   },
   actionsRow: {
@@ -559,11 +615,8 @@ const styles = StyleSheet.create({
   action: {
     flex: 1
   },
-  stickyWrap: {
-    marginHorizontal: -16,
-    paddingHorizontal: 16,
-    paddingBottom: 2,
-    backgroundColor: "#f3efe7"
+  controlsWrap: {
+    paddingBottom: 2
   },
   stickyBar: {
     gap: 8,
@@ -719,6 +772,15 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "700"
   },
+  lazyInfoRow: {
+    flexDirection: "row",
+    justifyContent: "flex-end"
+  },
+  lazyInfoLabel: {
+    color: "#8a7355",
+    fontSize: 11,
+    fontWeight: "700"
+  },
   sortChip: {
     paddingHorizontal: 10,
     paddingVertical: 6,
@@ -736,8 +798,8 @@ const styles = StyleSheet.create({
   sortChipLabelActive: {
     color: "#fff8ee"
   },
-  list: {
-    gap: 6
+  separator: {
+    height: 6
   },
   emptyState: {
     borderRadius: 14,
@@ -758,5 +820,14 @@ const styles = StyleSheet.create({
   error: {
     color: "#8f2f2f",
     lineHeight: 22
+  },
+  footerLoader: {
+    paddingVertical: 10,
+    alignItems: "center"
+  },
+  footerLoaderLabel: {
+    color: "#7d6240",
+    fontSize: 12,
+    fontWeight: "700"
   }
 });

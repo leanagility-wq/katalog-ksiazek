@@ -36,6 +36,9 @@ export const appText = {
     batchApplyingStatus: (status: string) => `Ustawiam status: ${status}`,
     batchApplyingLocation: (location: string) => `Przypisuję lokalizację: ${location}`,
     batchApplyingClearLocation: "Usuwam lokalizację z zaznaczonych",
+    lazyLoadedCount: (loaded: number, total: number) =>
+      `Widoczne: ${loaded} z ${total}`,
+    lazyLoadingMore: "Dociągam kolejne książki...",
     emptyTitle: "Nie ma jeszcze pasujących książek.",
     emptyDescription:
       "Zeskanuj półkę albo dodaj tytuł ręcznie, a potem uzupełnij szczegóły z sieci."
