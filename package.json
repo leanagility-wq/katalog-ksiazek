@@ -1,0 +1,26 @@
+{
+  "name": "katalog-ksiazek-mobile",
+  "version": "0.1.0",
+  "private": true,
+  "main": "node_modules/expo/AppEntry.js",
+  "scripts": {
+    "start": "expo start",
+    "android": "expo run:android",
+    "web": "expo start --web",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "expo": "~54.0.0",
+    "expo-camera": "~17.0.0",
+    "expo-file-system": "~18.0.0",
+    "expo-sqlite": "~15.0.0",
+    "react": "19.1.0",
+    "react-native": "0.81.0",
+    "zustand": "^5.0.8"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.28.0",
+    "@types/react": "~19.1.10",
+    "typescript": "~5.9.2"
+  }
+}

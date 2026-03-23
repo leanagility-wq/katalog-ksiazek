@@ -1,0 +1,18 @@
+{
+  "expo": {
+    "name": "Katalog Ksiazek",
+    "slug": "katalog-ksiazek",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "android": {
+      "package": "pl.katalogksiazek.mobile",
+      "permissions": [
+        "CAMERA"
+      ]
+    }
+  }
+}
