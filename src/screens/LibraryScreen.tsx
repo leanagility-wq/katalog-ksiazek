@@ -94,6 +94,16 @@ export function LibraryScreen({ onStartScan }: LibraryScreenProps) {
     return sortedBooks;
   }, [books, query, sortKey]);
 
+  const visibleWithoutLocationCount = useMemo(
+    () => visibleBooks.filter((book) => !book.shelfLocation?.trim()).length,
+    [visibleBooks]
+  );
+
+  const visibleNeedsReviewCount = useMemo(
+    () => visibleBooks.filter((book) => book.status === "needs_review").length,
+    [visibleBooks]
+  );
+
   const closeEditor = () => {
     setSelectedBookId(null);
     setIsCreating(false);
@@ -155,6 +165,10 @@ export function LibraryScreen({ onStartScan }: LibraryScreenProps) {
         .filter((book) => book.status === "needs_review")
         .map((book) => book.id)
     );
+  };
+
+  const selectAllVisibleBooks = () => {
+    replaceSelection(visibleBooks.map((book) => book.id));
   };
 
   const updateBookQuickly = async (
@@ -301,12 +315,33 @@ export function LibraryScreen({ onStartScan }: LibraryScreenProps) {
             })}
           </View>
 
+          <View style={styles.visibleStatsRow}>
+            <View style={styles.visibleStatChip}>
+              <Text style={styles.visibleStatLabel}>
+                {appText.library.visibleWithoutLocationLabel(visibleWithoutLocationCount)}
+              </Text>
+            </View>
+            <View style={styles.visibleStatChip}>
+              <Text style={styles.visibleStatLabel}>
+                {appText.library.visibleNeedsReviewLabel(visibleNeedsReviewCount)}
+              </Text>
+            </View>
+          </View>
+
           {isSelectionMode ? (
             <View style={styles.batchPanel}>
               <Text style={styles.batchCount}>
                 {appText.library.batchSelectedLabel(selectedBookIds.length)}
               </Text>
               <View style={styles.batchShortcuts}>
+                <Pressable
+                  onPress={selectAllVisibleBooks}
+                  style={styles.batchShortcutChip}
+                >
+                  <Text style={styles.batchShortcutLabel}>
+                    {appText.library.selectAllVisible}
+                  </Text>
+                </Pressable>
                 <Pressable
                   onPress={selectBooksWithoutLocation}
                   style={styles.batchShortcutChip}
@@ -574,6 +609,22 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     flexWrap: "wrap",
     gap: 6
+  },
+  visibleStatsRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 6
+  },
+  visibleStatChip: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 999,
+    backgroundColor: "#f4ede2"
+  },
+  visibleStatLabel: {
+    color: "#6b5640",
+    fontSize: 12,
+    fontWeight: "700"
   },
   sortChip: {
     paddingHorizontal: 10,
