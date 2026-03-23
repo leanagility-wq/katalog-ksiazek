@@ -14,7 +14,11 @@ type QuickEditMode = "status" | "location" | null;
 interface BookListItemProps {
   book: Book;
   isDuplicate?: boolean;
+  isSelectable?: boolean;
+  isSelected?: boolean;
   onPress?: () => void;
+  onTitleLongPress?: () => void;
+  onToggleSelection?: () => void;
   quickEditMode?: QuickEditMode;
   isUpdating?: boolean;
   locationOptions: string[];
@@ -26,7 +30,11 @@ interface BookListItemProps {
 export function BookListItem({
   book,
   isDuplicate = false,
+  isSelectable = false,
+  isSelected = false,
   onPress,
+  onTitleLongPress,
+  onToggleSelection,
   quickEditMode = null,
   isUpdating = false,
   locationOptions,
@@ -44,14 +52,27 @@ export function BookListItem({
   return (
     <View style={styles.wrapper}>
       <Pressable
-        onPress={onPress}
+        onPress={isSelectable ? onToggleSelection : onPress}
         style={({ pressed }) => [styles.row, pressed ? styles.rowPressed : null]}
       >
         <View style={styles.mainRow}>
+          {isSelectable ? (
+            <Pressable onPress={onToggleSelection} style={styles.checkboxWrap}>
+              <View style={[styles.checkbox, isSelected ? styles.checkboxActive : null]}>
+                {isSelected ? <Text style={styles.checkboxTick}>✓</Text> : null}
+              </View>
+            </Pressable>
+          ) : null}
           <View style={styles.copy}>
-            <Text numberOfLines={1} style={styles.title}>
-              {book.title || "Bez tytułu"}
-            </Text>
+            <Pressable
+              onLongPress={onTitleLongPress}
+              delayLongPress={260}
+              disabled={isSelectable}
+            >
+              <Text numberOfLines={1} style={styles.title}>
+                {book.title || "Bez tytułu"}
+              </Text>
+            </Pressable>
             <Text numberOfLines={1} style={styles.meta}>
               {book.author || "Autor do uzupełnienia"}
             </Text>
@@ -63,6 +84,7 @@ export function BookListItem({
             <View style={styles.metaRow}>
               <Pressable
                 onPress={() => onToggleQuickEdit("location")}
+                disabled={isSelectable}
                 style={styles.metaPill}
               >
                 <Text numberOfLines={1} style={styles.metaPillText}>
@@ -79,6 +101,7 @@ export function BookListItem({
           <View style={styles.sideColumn}>
             <Pressable
               onPress={() => onToggleQuickEdit("status")}
+              disabled={isSelectable}
               style={[
                 styles.badge,
                 { backgroundColor: statusStyle.backgroundColor }
@@ -88,12 +111,12 @@ export function BookListItem({
                 {STATUS_LABELS[book.status]}
               </Text>
             </Pressable>
-            <Text style={styles.arrow}>{">"}</Text>
+            {!isSelectable ? <Text style={styles.arrow}>{">"}</Text> : null}
           </View>
         </View>
       </Pressable>
 
-      {quickEditMode === "status" ? (
+      {quickEditMode === "status" && !isSelectable ? (
         <View style={styles.quickPanel}>
           <Text style={styles.quickTitle}>Zmień status</Text>
           <View style={styles.quickOptions}>
@@ -131,7 +154,7 @@ export function BookListItem({
         </View>
       ) : null}
 
-      {quickEditMode === "location" ? (
+      {quickEditMode === "location" && !isSelectable ? (
         <View style={styles.quickPanel}>
           <Text style={styles.quickTitle}>Zmień lokalizację</Text>
           {locationOptions.length ? (
@@ -198,6 +221,28 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "flex-start",
     gap: 10
+  },
+  checkboxWrap: {
+    paddingTop: 2
+  },
+  checkbox: {
+    width: 24,
+    height: 24,
+    borderRadius: 7,
+    borderWidth: 1,
+    borderColor: "#ceb99a",
+    backgroundColor: "#fffaf2",
+    alignItems: "center",
+    justifyContent: "center"
+  },
+  checkboxActive: {
+    backgroundColor: "#704d2e",
+    borderColor: "#704d2e"
+  },
+  checkboxTick: {
+    color: "#fffaf2",
+    fontSize: 14,
+    fontWeight: "800"
   },
   sideColumn: {
     alignItems: "flex-end",

@@ -8,7 +8,7 @@ import {
   View
 } from "react-native";
 
-import { SORT_OPTIONS, SortKey } from "@/config/bookUi";
+import { SORT_OPTIONS, SortKey, STATUS_OPTIONS } from "@/config/bookUi";
 import { appText } from "@/config/uiText";
 import { BookListItem } from "@/components/BookListItem";
 import { PrimaryButton } from "@/components/PrimaryButton";
@@ -35,6 +35,11 @@ export function LibraryScreen({ onStartScan }: LibraryScreenProps) {
   const [quickEditBookId, setQuickEditBookId] = useState<string | null>(null);
   const [quickEditMode, setQuickEditMode] = useState<QuickEditMode>(null);
   const [updatingBookId, setUpdatingBookId] = useState<string | null>(null);
+  const [selectedBookIds, setSelectedBookIds] = useState<string[]>([]);
+  const [batchLocationDraft, setBatchLocationDraft] = useState("");
+  const [isApplyingBatch, setIsApplyingBatch] = useState(false);
+
+  const isSelectionMode = selectedBookIds.length > 0;
 
   const selectedBook = useMemo(
     () => books.find((book) => book.id === selectedBookId) ?? null,
@@ -54,6 +59,7 @@ export function LibraryScreen({ onStartScan }: LibraryScreenProps) {
   );
 
   const duplicateBookIds = useMemo(() => collectDuplicateBookIds(books), [books]);
+  const selectedBookIdSet = useMemo(() => new Set(selectedBookIds), [selectedBookIds]);
 
   const visibleBooks = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
@@ -98,10 +104,19 @@ export function LibraryScreen({ onStartScan }: LibraryScreenProps) {
     setQuickEditMode(null);
   };
 
+  const clearSelection = () => {
+    setSelectedBookIds([]);
+    setBatchLocationDraft("");
+  };
+
   const handleQuickEditToggle = (
     bookId: string,
     mode: Exclude<QuickEditMode, null>
   ) => {
+    if (isSelectionMode) {
+      return;
+    }
+
     if (quickEditBookId === bookId && quickEditMode === mode) {
       closeQuickEdit();
       return;
@@ -109,6 +124,37 @@ export function LibraryScreen({ onStartScan }: LibraryScreenProps) {
 
     setQuickEditBookId(bookId);
     setQuickEditMode(mode);
+  };
+
+  const enterSelectionMode = (bookId: string) => {
+    closeQuickEdit();
+    setSelectedBookIds([bookId]);
+  };
+
+  const toggleSelection = (bookId: string) => {
+    setSelectedBookIds((current) =>
+      current.includes(bookId)
+        ? current.filter((id) => id !== bookId)
+        : [...current, bookId]
+    );
+  };
+
+  const replaceSelection = (bookIds: string[]) => {
+    setSelectedBookIds(Array.from(new Set(bookIds)));
+  };
+
+  const selectBooksWithoutLocation = () => {
+    replaceSelection(
+      visibleBooks.filter((book) => !book.shelfLocation?.trim()).map((book) => book.id)
+    );
+  };
+
+  const selectBooksNeedingReview = () => {
+    replaceSelection(
+      visibleBooks
+        .filter((book) => book.status === "needs_review")
+        .map((book) => book.id)
+    );
   };
 
   const updateBookQuickly = async (
@@ -134,6 +180,41 @@ export function LibraryScreen({ onStartScan }: LibraryScreenProps) {
 
   const handleQuickLocationSave = async (book: Book, location?: string) => {
     await updateBookQuickly(book, {
+      shelfLocation: location?.trim() || undefined
+    });
+  };
+
+  const applyBatchChanges = async (
+    changes: Partial<Pick<Book, "status" | "shelfLocation">>
+  ) => {
+    const selectedBooks = books.filter((book) => selectedBookIdSet.has(book.id));
+
+    if (!selectedBooks.length) {
+      return;
+    }
+
+    setIsApplyingBatch(true);
+
+    try {
+      for (const book of selectedBooks) {
+        await saveBook({
+          ...book,
+          ...changes
+        });
+      }
+
+      clearSelection();
+    } finally {
+      setIsApplyingBatch(false);
+    }
+  };
+
+  const handleBatchStatusApply = async (status: BookStatus) => {
+    await applyBatchChanges({ status });
+  };
+
+  const handleBatchLocationApply = async (location?: string) => {
+    await applyBatchChanges({
       shelfLocation: location?.trim() || undefined
     });
   };
@@ -182,6 +263,9 @@ export function LibraryScreen({ onStartScan }: LibraryScreenProps) {
         </View>
 
         {errorMessage ? <Text style={styles.error}>{errorMessage}</Text> : null}
+        {!isSelectionMode ? (
+          <Text style={styles.selectionHint}>{appText.library.batchModeHint}</Text>
+        ) : null}
       </SectionCard>
 
       <View style={styles.stickyWrap}>
@@ -216,6 +300,108 @@ export function LibraryScreen({ onStartScan }: LibraryScreenProps) {
               );
             })}
           </View>
+
+          {isSelectionMode ? (
+            <View style={styles.batchPanel}>
+              <Text style={styles.batchCount}>
+                {appText.library.batchSelectedLabel(selectedBookIds.length)}
+              </Text>
+              <View style={styles.batchShortcuts}>
+                <Pressable
+                  onPress={selectBooksWithoutLocation}
+                  style={styles.batchShortcutChip}
+                >
+                  <Text style={styles.batchShortcutLabel}>
+                    {appText.library.selectNoLocation}
+                  </Text>
+                </Pressable>
+                <Pressable
+                  onPress={selectBooksNeedingReview}
+                  style={styles.batchShortcutChip}
+                >
+                  <Text style={styles.batchShortcutLabel}>
+                    {appText.library.selectNeedsReview}
+                  </Text>
+                </Pressable>
+                <Pressable onPress={clearSelection} style={styles.batchClearChip}>
+                  <Text style={styles.batchClearLabel}>
+                    {appText.library.clearSelection}
+                  </Text>
+                </Pressable>
+              </View>
+
+              <View style={styles.batchBlock}>
+                <Text style={styles.batchTitle}>{appText.library.batchStatusTitle}</Text>
+                <View style={styles.batchOptions}>
+                  {STATUS_OPTIONS.map((option) => (
+                    <Pressable
+                      key={option.key}
+                      onPress={() => {
+                        void handleBatchStatusApply(option.key);
+                      }}
+                      disabled={isApplyingBatch}
+                      style={styles.batchOptionChip}
+                    >
+                      <Text style={styles.batchOptionLabel}>{option.label}</Text>
+                    </Pressable>
+                  ))}
+                </View>
+              </View>
+
+              <View style={styles.batchBlock}>
+                <Text style={styles.batchTitle}>{appText.library.batchLocationTitle}</Text>
+                {locationOptions.length ? (
+                  <View style={styles.batchOptions}>
+                    {locationOptions.map((location) => (
+                      <Pressable
+                        key={location}
+                        onPress={() => {
+                          void handleBatchLocationApply(location);
+                        }}
+                        disabled={isApplyingBatch}
+                        style={styles.batchOptionChip}
+                      >
+                        <Text style={styles.batchOptionLabel}>{location}</Text>
+                      </Pressable>
+                    ))}
+                  </View>
+                ) : null}
+                <TextInput
+                  value={batchLocationDraft}
+                  onChangeText={setBatchLocationDraft}
+                  placeholder={appText.library.batchLocationPlaceholder}
+                  placeholderTextColor="#9a8a76"
+                  style={styles.batchLocationInput}
+                />
+                <View style={styles.batchActionRow}>
+                  <View style={styles.batchAction}>
+                    <PrimaryButton
+                      label={
+                        isApplyingBatch
+                          ? appText.library.batchApplying
+                          : appText.library.batchSaveLocation
+                      }
+                      onPress={() => {
+                        void handleBatchLocationApply(batchLocationDraft);
+                      }}
+                      disabled={isApplyingBatch}
+                      compact
+                    />
+                  </View>
+                  <View style={styles.batchAction}>
+                    <PrimaryButton
+                      label={appText.library.batchClearLocation}
+                      onPress={() => {
+                        void handleBatchLocationApply(undefined);
+                      }}
+                      disabled={isApplyingBatch}
+                      compact
+                    />
+                  </View>
+                </View>
+              </View>
+            </View>
+          ) : null}
         </View>
       </View>
 
@@ -226,8 +412,14 @@ export function LibraryScreen({ onStartScan }: LibraryScreenProps) {
               key={book.id}
               book={book}
               isDuplicate={duplicateBookIds.has(book.id)}
+              isSelectable={isSelectionMode}
+              isSelected={selectedBookIdSet.has(book.id)}
               onPress={() => setSelectedBookId(book.id)}
-              quickEditMode={quickEditBookId === book.id ? quickEditMode : null}
+              onTitleLongPress={() => enterSelectionMode(book.id)}
+              onToggleSelection={() => toggleSelection(book.id)}
+              quickEditMode={
+                !isSelectionMode && quickEditBookId === book.id ? quickEditMode : null
+              }
               isUpdating={updatingBookId === book.id}
               locationOptions={locationOptions.filter(
                 (location) => location !== book.shelfLocation
@@ -263,6 +455,11 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     gap: 8
   },
+  selectionHint: {
+    color: "#7d6240",
+    fontSize: 12,
+    lineHeight: 18
+  },
   action: {
     flex: 1
   },
@@ -290,6 +487,88 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 10,
     fontSize: 14
+  },
+  batchPanel: {
+    gap: 10,
+    borderTopWidth: 1,
+    borderTopColor: "#eadfce",
+    paddingTop: 10
+  },
+  batchCount: {
+    color: "#3e2f1f",
+    fontSize: 13,
+    fontWeight: "800"
+  },
+  batchShortcuts: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 6
+  },
+  batchShortcutChip: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 999,
+    backgroundColor: "#efe3cf"
+  },
+  batchShortcutLabel: {
+    color: "#6c5232",
+    fontSize: 12,
+    fontWeight: "700"
+  },
+  batchClearChip: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 999,
+    backgroundColor: "#f5ddd9"
+  },
+  batchClearLabel: {
+    color: "#8b3028",
+    fontSize: 12,
+    fontWeight: "700"
+  },
+  batchBlock: {
+    gap: 8
+  },
+  batchTitle: {
+    color: "#4c3926",
+    fontSize: 12,
+    fontWeight: "800"
+  },
+  batchOptions: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 6
+  },
+  batchOptionChip: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: "#e5d8c3",
+    backgroundColor: "#f2ebdf"
+  },
+  batchOptionLabel: {
+    color: "#6e5a43",
+    fontSize: 12,
+    fontWeight: "700"
+  },
+  batchLocationInput: {
+    minHeight: 40,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#e1d4bf",
+    backgroundColor: "#fffdf8",
+    color: "#2d2419",
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+    fontSize: 14
+  },
+  batchActionRow: {
+    flexDirection: "row",
+    gap: 8
+  },
+  batchAction: {
+    flex: 1
   },
   sortRow: {
     flexDirection: "row",

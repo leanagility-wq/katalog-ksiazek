@@ -19,6 +19,17 @@ export const appText = {
     scanButton: "Zeskanuj nową półkę",
     addManualButton: "Dodaj ręcznie",
     searchPlaceholder: "Szukaj po tytule, autorze, ISBN albo lokalizacji",
+    batchSelectedLabel: (count: number) => `Zaznaczono: ${count}`,
+    batchModeHint: "Przytrzymaj tytuł książki, aby zaznaczać wiele pozycji naraz.",
+    selectNoLocation: "Bez lokalizacji",
+    selectNeedsReview: "Do poprawy",
+    clearSelection: "Wyczyść",
+    batchStatusTitle: "Ustaw status dla zaznaczonych",
+    batchLocationTitle: "Przypisz lokalizację zaznaczonym",
+    batchLocationPlaceholder: "Wpisz lokalizację dla zaznaczonych",
+    batchSaveLocation: "Ustaw lokalizację",
+    batchClearLocation: "Wyczyść lokalizację",
+    batchApplying: "Zapisywanie zmian...",
     emptyTitle: "Nie ma jeszcze pasujących książek.",
     emptyDescription:
       "Zeskanuj półkę albo dodaj tytuł ręcznie, a potem uzupełnij szczegóły z sieci."
