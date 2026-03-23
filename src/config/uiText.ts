@@ -33,6 +33,9 @@ export const appText = {
     batchSaveLocation: "Ustaw lokalizację",
     batchClearLocation: "Wyczyść lokalizację",
     batchApplying: "Zapisywanie zmian...",
+    batchApplyingStatus: (status: string) => `Ustawiam status: ${status}`,
+    batchApplyingLocation: (location: string) => `Przypisuję lokalizację: ${location}`,
+    batchApplyingClearLocation: "Usuwam lokalizację z zaznaczonych",
     emptyTitle: "Nie ma jeszcze pasujących książek.",
     emptyDescription:
       "Zeskanuj półkę albo dodaj tytuł ręcznie, a potem uzupełnij szczegóły z sieci."

@@ -39,6 +39,7 @@ export function LibraryScreen({ onStartScan }: LibraryScreenProps) {
   const [selectedBookIds, setSelectedBookIds] = useState<string[]>([]);
   const [batchLocationDraft, setBatchLocationDraft] = useState("");
   const [isApplyingBatch, setIsApplyingBatch] = useState(false);
+  const [batchActionMessage, setBatchActionMessage] = useState<string | null>(null);
 
   const isSelectionMode = selectedBookIds.length > 0;
 
@@ -118,6 +119,7 @@ export function LibraryScreen({ onStartScan }: LibraryScreenProps) {
   const clearSelection = () => {
     setSelectedBookIds([]);
     setBatchLocationDraft("");
+    setBatchActionMessage(null);
   };
 
   const handleQuickEditToggle = (
@@ -200,7 +202,8 @@ export function LibraryScreen({ onStartScan }: LibraryScreenProps) {
   };
 
   const applyBatchChanges = async (
-    changes: Partial<Pick<Book, "status" | "shelfLocation">>
+    changes: Partial<Pick<Book, "status" | "shelfLocation">>,
+    actionMessage: string
   ) => {
     const selectedIds = books
       .filter((book) => selectedBookIdSet.has(book.id))
@@ -211,23 +214,38 @@ export function LibraryScreen({ onStartScan }: LibraryScreenProps) {
     }
 
     setIsApplyingBatch(true);
+    setBatchActionMessage(actionMessage);
 
     try {
       await applyBatchUpdate(selectedIds, changes);
       clearSelection();
     } finally {
       setIsApplyingBatch(false);
+      setBatchActionMessage(null);
     }
   };
 
   const handleBatchStatusApply = async (status: BookStatus) => {
-    await applyBatchChanges({ status });
+    const statusLabel =
+      STATUS_OPTIONS.find((option) => option.key === status)?.label ?? status;
+
+    await applyBatchChanges(
+      { status },
+      appText.library.batchApplyingStatus(statusLabel)
+    );
   };
 
   const handleBatchLocationApply = async (location?: string) => {
-    await applyBatchChanges({
-      shelfLocation: location?.trim() || undefined
-    });
+    const normalizedLocation = location?.trim();
+
+    await applyBatchChanges(
+      {
+        shelfLocation: normalizedLocation || undefined
+      },
+      normalizedLocation
+        ? appText.library.batchApplyingLocation(normalizedLocation)
+        : appText.library.batchApplyingClearLocation
+    );
   };
 
   if (selectedBook || isCreating) {
@@ -336,10 +354,20 @@ export function LibraryScreen({ onStartScan }: LibraryScreenProps) {
               <Text style={styles.batchCount}>
                 {appText.library.batchSelectedLabel(selectedBookIds.length)}
               </Text>
+              {batchActionMessage ? (
+                <View style={styles.batchMessage}>
+                  <Text style={styles.batchMessageLabel}>{batchActionMessage}</Text>
+                </View>
+              ) : null}
               <View style={styles.batchShortcuts}>
                 <Pressable
                   onPress={selectAllVisibleBooks}
-                  style={styles.batchShortcutChip}
+                  style={({ pressed }) => [
+                    styles.batchShortcutChip,
+                    pressed ? styles.batchChipPressed : null,
+                    isApplyingBatch ? styles.batchChipDisabled : null
+                  ]}
+                  disabled={isApplyingBatch}
                 >
                   <Text style={styles.batchShortcutLabel}>
                     {appText.library.selectAllVisible}
@@ -347,7 +375,12 @@ export function LibraryScreen({ onStartScan }: LibraryScreenProps) {
                 </Pressable>
                 <Pressable
                   onPress={selectBooksWithoutLocation}
-                  style={styles.batchShortcutChip}
+                  style={({ pressed }) => [
+                    styles.batchShortcutChip,
+                    pressed ? styles.batchChipPressed : null,
+                    isApplyingBatch ? styles.batchChipDisabled : null
+                  ]}
+                  disabled={isApplyingBatch}
                 >
                   <Text style={styles.batchShortcutLabel}>
                     {appText.library.selectNoLocation}
@@ -355,13 +388,26 @@ export function LibraryScreen({ onStartScan }: LibraryScreenProps) {
                 </Pressable>
                 <Pressable
                   onPress={selectBooksNeedingReview}
-                  style={styles.batchShortcutChip}
+                  style={({ pressed }) => [
+                    styles.batchShortcutChip,
+                    pressed ? styles.batchChipPressed : null,
+                    isApplyingBatch ? styles.batchChipDisabled : null
+                  ]}
+                  disabled={isApplyingBatch}
                 >
                   <Text style={styles.batchShortcutLabel}>
                     {appText.library.selectNeedsReview}
                   </Text>
                 </Pressable>
-                <Pressable onPress={clearSelection} style={styles.batchClearChip}>
+                <Pressable
+                  onPress={clearSelection}
+                  style={({ pressed }) => [
+                    styles.batchClearChip,
+                    pressed ? styles.batchChipPressed : null,
+                    isApplyingBatch ? styles.batchChipDisabled : null
+                  ]}
+                  disabled={isApplyingBatch}
+                >
                   <Text style={styles.batchClearLabel}>
                     {appText.library.clearSelection}
                   </Text>
@@ -378,7 +424,11 @@ export function LibraryScreen({ onStartScan }: LibraryScreenProps) {
                         void handleBatchStatusApply(option.key);
                       }}
                       disabled={isApplyingBatch}
-                      style={styles.batchOptionChip}
+                      style={({ pressed }) => [
+                        styles.batchOptionChip,
+                        pressed ? styles.batchOptionChipPressed : null,
+                        isApplyingBatch ? styles.batchChipDisabled : null
+                      ]}
                     >
                       <Text style={styles.batchOptionLabel}>{option.label}</Text>
                     </Pressable>
@@ -397,7 +447,11 @@ export function LibraryScreen({ onStartScan }: LibraryScreenProps) {
                           void handleBatchLocationApply(location);
                         }}
                         disabled={isApplyingBatch}
-                        style={styles.batchOptionChip}
+                        style={({ pressed }) => [
+                          styles.batchOptionChip,
+                          pressed ? styles.batchOptionChipPressed : null,
+                          isApplyingBatch ? styles.batchChipDisabled : null
+                        ]}
                       >
                         <Text style={styles.batchOptionLabel}>{location}</Text>
                       </Pressable>
@@ -532,6 +586,19 @@ const styles = StyleSheet.create({
     borderTopColor: "#eadfce",
     paddingTop: 10
   },
+  batchMessage: {
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    borderRadius: 12,
+    backgroundColor: "#efe3cf",
+    borderWidth: 1,
+    borderColor: "#dcc7a8"
+  },
+  batchMessageLabel: {
+    color: "#6c5232",
+    fontSize: 12,
+    fontWeight: "700"
+  },
   batchCount: {
     color: "#3e2f1f",
     fontSize: 13,
@@ -546,7 +613,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 6,
     borderRadius: 999,
-    backgroundColor: "#efe3cf"
+    backgroundColor: "#efe3cf",
+    borderWidth: 1,
+    borderColor: "#dcc7a8"
   },
   batchShortcutLabel: {
     color: "#6c5232",
@@ -557,12 +626,21 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 6,
     borderRadius: 999,
-    backgroundColor: "#f5ddd9"
+    backgroundColor: "#f5ddd9",
+    borderWidth: 1,
+    borderColor: "#e7bdb5"
   },
   batchClearLabel: {
     color: "#8b3028",
     fontSize: 12,
     fontWeight: "700"
+  },
+  batchChipPressed: {
+    transform: [{ scale: 0.98 }],
+    opacity: 0.9
+  },
+  batchChipDisabled: {
+    opacity: 0.55
   },
   batchBlock: {
     gap: 8
@@ -584,6 +662,11 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#e5d8c3",
     backgroundColor: "#f2ebdf"
+  },
+  batchOptionChipPressed: {
+    backgroundColor: "#e7dccb",
+    borderColor: "#b69264",
+    transform: [{ scale: 0.98 }]
   },
   batchOptionLabel: {
     color: "#6e5a43",
