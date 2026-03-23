@@ -83,37 +83,37 @@ export function ScanScreen({ onMockScanReady }: ScanScreenProps) {
             <PrimaryButton
               label={appText.scan.permissionButton}
               onPress={() => void requestPermission()}
+              compact
             />
           </View>
         )}
+
+        <View style={styles.captureRow}>
+          <View style={styles.captureButtonWrap}>
+            <PrimaryButton
+              label={
+                isProcessing
+                  ? appText.scan.processingButton
+                  : appText.scan.captureButton
+              }
+              onPress={() => void handleCaptureAndScan()}
+              disabled={isProcessing || !permission?.granted}
+              compact
+            />
+          </View>
+          <View style={styles.modeBadge}>
+            <Text style={styles.modeBadgeText}>
+              {openAIApiKey ? "OCR online" : "Fallback lokalny"}
+            </Text>
+          </View>
+        </View>
+
         <View style={styles.guideBox}>
           <Text style={styles.guideTitle}>{appText.scan.guideTitle}</Text>
           <Text style={styles.guideHint}>{appText.scan.guideDescription}</Text>
         </View>
-        {scanMessage ? <Text style={styles.status}>{scanMessage}</Text> : null}
-        <PrimaryButton
-          label={
-            isProcessing
-              ? appText.scan.processingButton
-              : appText.scan.captureButton
-          }
-          onPress={() => void handleCaptureAndScan()}
-          disabled={isProcessing || !permission?.granted}
-        />
-      </SectionCard>
 
-      <SectionCard
-        title={appText.scan.tipsTitle}
-        subtitle={appText.scan.tipsSubtitle}
-      >
-        {appText.scan.tips.map((tip) => (
-          <Text key={tip} style={styles.listItem}>
-            {tip}
-          </Text>
-        ))}
-        <Text style={styles.listItem}>
-          {openAIApiKey ? appText.scan.apiKeyPresent : appText.scan.apiKeyMissing}
-        </Text>
+        {scanMessage ? <Text style={styles.status}>{scanMessage}</Text> : null}
       </SectionCard>
     </ScrollView>
   );
@@ -127,7 +127,7 @@ const styles = StyleSheet.create({
     gap: 12
   },
   cameraShell: {
-    height: 240,
+    height: 228,
     borderRadius: 18,
     overflow: "hidden",
     backgroundColor: "#1f1811",
@@ -137,24 +137,44 @@ const styles = StyleSheet.create({
   cameraPreview: {
     flex: 1
   },
+  captureRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8
+  },
+  captureButtonWrap: {
+    flex: 1
+  },
+  modeBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    borderRadius: 999,
+    backgroundColor: "#efe4ce"
+  },
+  modeBadgeText: {
+    color: "#6d5636",
+    fontSize: 12,
+    fontWeight: "700"
+  },
   guideBox: {
-    marginTop: 10,
     borderRadius: 14,
     borderWidth: 1,
     borderStyle: "dashed",
     borderColor: "#d8c5a7",
     backgroundColor: "#fbf4e8",
     paddingHorizontal: 12,
-    paddingVertical: 10,
-    gap: 4
+    paddingVertical: 9,
+    gap: 3
   },
   guideTitle: {
     color: "#3e2f1f",
-    fontWeight: "700"
+    fontWeight: "700",
+    fontSize: 13
   },
   guideHint: {
     color: "#6f5a42",
-    lineHeight: 20
+    lineHeight: 18,
+    fontSize: 13
   },
   cameraFallback: {
     minHeight: 180,
@@ -177,13 +197,9 @@ const styles = StyleSheet.create({
     color: "#5d4b39",
     lineHeight: 22
   },
-  listItem: {
-    color: "#4c3926",
-    fontSize: 15,
-    lineHeight: 22
-  },
   status: {
     color: "#6f5a42",
-    lineHeight: 22
+    lineHeight: 20,
+    fontSize: 13
   }
 });

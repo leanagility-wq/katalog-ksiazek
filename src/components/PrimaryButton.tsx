@@ -4,12 +4,14 @@ interface PrimaryButtonProps {
   label: string;
   onPress?: () => void;
   disabled?: boolean;
+  compact?: boolean;
 }
 
 export function PrimaryButton({
   label,
   onPress,
-  disabled = false
+  disabled = false,
+  compact = false
 }: PrimaryButtonProps) {
   return (
     <Pressable
@@ -17,6 +19,7 @@ export function PrimaryButton({
       onPress={onPress}
       style={({ pressed }) => [
         styles.button,
+        compact ? styles.buttonCompact : null,
         pressed && !disabled ? styles.buttonPressed : null,
         disabled ? styles.buttonDisabled : null
       ]}
@@ -35,6 +38,12 @@ const styles = StyleSheet.create({
     paddingVertical: 11,
     alignItems: "center",
     justifyContent: "center"
+  },
+  buttonCompact: {
+    minHeight: 40,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+    borderRadius: 12
   },
   buttonPressed: {
     opacity: 0.92

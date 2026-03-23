@@ -24,19 +24,19 @@ const styles = StyleSheet.create({
   card: {
     backgroundColor: "#fffaf2",
     borderRadius: 18,
-    padding: 14,
-    gap: 8,
+    padding: 12,
+    gap: 6,
     borderWidth: 1,
     borderColor: "#e7dcc9"
   },
   title: {
-    fontSize: 17,
+    fontSize: 16,
     fontWeight: "700",
     color: "#3e2f1f"
   },
   subtitle: {
-    fontSize: 13,
-    lineHeight: 19,
+    fontSize: 12,
+    lineHeight: 17,
     color: "#6f5a42"
   },
   content: {

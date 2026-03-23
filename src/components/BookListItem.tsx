@@ -14,20 +14,32 @@ export function BookListItem({ book, onPress }: BookListItemProps) {
       onPress={onPress}
       style={({ pressed }) => [styles.row, pressed ? styles.rowPressed : null]}
     >
-      <View style={styles.headerRow}>
-        <View style={styles.badge}>
-          <Text style={styles.badgeText}>{STATUS_LABELS[book.status]}</Text>
+      <View style={styles.mainRow}>
+        <View style={styles.copy}>
+          <Text numberOfLines={1} style={styles.title}>
+            {book.title || "Bez tytułu"}
+          </Text>
+          <Text numberOfLines={1} style={styles.meta}>
+            {book.author || "Autor do uzupełnienia"}
+          </Text>
+          <View style={styles.metaRow}>
+            {book.shelfLocation ? (
+              <Text numberOfLines={1} style={styles.metaPill}>
+                {book.shelfLocation}
+              </Text>
+            ) : null}
+            {book.isbn ? (
+              <Text numberOfLines={1} style={styles.metaPill}>
+                ISBN {book.isbn}
+              </Text>
+            ) : null}
+          </View>
         </View>
-        <Text style={styles.arrow}>{">"}</Text>
-      </View>
-      <View style={styles.copy}>
-        <Text style={styles.title}>{book.title || "Bez tytułu"}</Text>
-        <Text style={styles.meta}>{book.author || "Autor do uzupełnienia"}</Text>
-        <View style={styles.metaRow}>
-          {book.shelfLocation ? (
-            <Text style={styles.metaPill}>{book.shelfLocation}</Text>
-          ) : null}
-          {book.isbn ? <Text style={styles.metaPill}>ISBN {book.isbn}</Text> : null}
+        <View style={styles.sideColumn}>
+          <View style={styles.badge}>
+            <Text style={styles.badgeText}>{STATUS_LABELS[book.status]}</Text>
+          </View>
+          <Text style={styles.arrow}>{">"}</Text>
         </View>
       </View>
     </Pressable>
@@ -36,9 +48,9 @@ export function BookListItem({ book, onPress }: BookListItemProps) {
 
 const styles = StyleSheet.create({
   row: {
-    gap: 10,
-    padding: 14,
-    borderRadius: 16,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 14,
     borderWidth: 1,
     borderColor: "#eee2cf",
     backgroundColor: "#fffdf8"
@@ -46,19 +58,23 @@ const styles = StyleSheet.create({
   rowPressed: {
     opacity: 0.9
   },
-  headerRow: {
+  mainRow: {
     flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between"
+    alignItems: "flex-start",
+    gap: 10
+  },
+  sideColumn: {
+    alignItems: "flex-end",
+    gap: 10
   },
   badge: {
     backgroundColor: "#efe4ce",
-    paddingHorizontal: 10,
-    paddingVertical: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 5,
     borderRadius: 999
   },
   badgeText: {
-    fontSize: 11,
+    fontSize: 10,
     textTransform: "uppercase",
     color: "#6d5636",
     fontWeight: "700"
@@ -69,29 +85,30 @@ const styles = StyleSheet.create({
     color: "#94785a"
   },
   copy: {
-    gap: 6
+    flex: 1,
+    gap: 4
   },
   title: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: "700",
     color: "#2d2419"
   },
   meta: {
-    fontSize: 13,
+    fontSize: 12,
     color: "#6f5a42"
   },
   metaRow: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 8
+    gap: 6
   },
   metaPill: {
-    paddingHorizontal: 10,
-    paddingVertical: 5,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
     borderRadius: 999,
     backgroundColor: "#f4ede2",
     color: "#6b5640",
-    fontSize: 12,
+    fontSize: 11,
     overflow: "hidden"
   }
 });

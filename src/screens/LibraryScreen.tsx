@@ -90,29 +90,6 @@ export function LibraryScreen({ onStartScan }: LibraryScreenProps) {
             : appText.library.countLabel(books.length)
         }
       >
-        <View style={styles.heroActions}>
-          <View style={styles.heroAction}>
-            <PrimaryButton
-              label={appText.library.scanButton}
-              onPress={onStartScan}
-            />
-          </View>
-          <View style={styles.heroAction}>
-            <PrimaryButton
-              label={appText.library.addManualButton}
-              onPress={() => {
-                setIsCreating(true);
-              }}
-            />
-          </View>
-        </View>
-        {errorMessage ? <Text style={styles.error}>{errorMessage}</Text> : null}
-      </SectionCard>
-
-      <SectionCard
-        title={appText.library.browseTitle}
-        subtitle={appText.library.browseSubtitle}
-      >
         <TextInput
           value={query}
           onChangeText={setQuery}
@@ -120,6 +97,28 @@ export function LibraryScreen({ onStartScan }: LibraryScreenProps) {
           placeholderTextColor="#9a8a76"
           style={styles.searchInput}
         />
+
+        <View style={styles.actionsRow}>
+          <View style={styles.action}>
+            <PrimaryButton
+              label={appText.library.scanButton}
+              onPress={onStartScan}
+              compact
+            />
+          </View>
+          <View style={styles.action}>
+            <PrimaryButton
+              label={appText.library.addManualButton}
+              onPress={() => {
+                setIsCreating(true);
+              }}
+              compact
+            />
+          </View>
+        </View>
+
+        {errorMessage ? <Text style={styles.error}>{errorMessage}</Text> : null}
+
         <View style={styles.sortRow}>
           {SORT_OPTIONS.map((option) => {
             const isActive = option.key === sortKey;
@@ -142,6 +141,7 @@ export function LibraryScreen({ onStartScan }: LibraryScreenProps) {
             );
           })}
         </View>
+
         <View style={styles.list}>
           {visibleBooks.length ? (
             visibleBooks.map((book) => (
@@ -159,17 +159,6 @@ export function LibraryScreen({ onStartScan }: LibraryScreenProps) {
           )}
         </View>
       </SectionCard>
-
-      <SectionCard
-        title={appText.library.guideTitle}
-        subtitle={appText.library.guideSubtitle}
-      >
-        {appText.library.guideSteps.map((step) => (
-          <Text key={step} style={styles.listItem}>
-            {step}
-          </Text>
-        ))}
-      </SectionCard>
     </ScrollView>
   );
 }
@@ -181,32 +170,32 @@ const styles = StyleSheet.create({
     paddingBottom: 18,
     gap: 12
   },
-  heroActions: {
-    flexDirection: "row",
-    gap: 10
-  },
-  heroAction: {
-    flex: 1
-  },
   searchInput: {
-    minHeight: 46,
+    minHeight: 42,
     borderRadius: 14,
     borderWidth: 1,
     borderColor: "#e1d4bf",
     backgroundColor: "#fffdf8",
     color: "#2d2419",
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    fontSize: 15
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 14
+  },
+  actionsRow: {
+    flexDirection: "row",
+    gap: 8
+  },
+  action: {
+    flex: 1
   },
   sortRow: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 8
+    gap: 6
   },
   sortChip: {
-    paddingHorizontal: 12,
-    paddingVertical: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
     borderRadius: 999,
     backgroundColor: "#eee2cf"
   },
@@ -215,14 +204,14 @@ const styles = StyleSheet.create({
   },
   sortChipLabel: {
     color: "#6d5636",
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: "700"
   },
   sortChipLabelActive: {
     color: "#fff8ee"
   },
   list: {
-    gap: 8
+    gap: 6
   },
   emptyState: {
     borderRadius: 14,
@@ -239,11 +228,6 @@ const styles = StyleSheet.create({
     color: "#6f5a42",
     fontSize: 14,
     lineHeight: 20
-  },
-  listItem: {
-    color: "#4c3926",
-    fontSize: 15,
-    lineHeight: 22
   },
   error: {
     color: "#8f2f2f",
