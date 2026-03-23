@@ -316,11 +316,17 @@ export function LibraryScreen({ onStartScan }: LibraryScreenProps) {
           </View>
 
           <View style={styles.visibleStatsRow}>
-            <View style={styles.visibleStatChip}>
+            <Pressable
+              onPress={selectBooksWithoutLocation}
+              style={({ pressed }) => [
+                styles.visibleStatChip,
+                pressed ? styles.visibleStatChipPressed : null
+              ]}
+            >
               <Text style={styles.visibleStatLabel}>
                 {appText.library.visibleWithoutLocationLabel(visibleWithoutLocationCount)}
               </Text>
-            </View>
+            </Pressable>
             <View style={styles.visibleStatChip}>
               <Text style={styles.visibleStatLabel}>
                 {appText.library.visibleNeedsReviewLabel(visibleNeedsReviewCount)}
@@ -620,6 +626,9 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     borderRadius: 999,
     backgroundColor: "#f4ede2"
+  },
+  visibleStatChipPressed: {
+    opacity: 0.82
   },
   visibleStatLabel: {
     color: "#6b5640",

@@ -20,7 +20,7 @@ export function mapCandidateToBook(
     author: candidate.authorSuggestion?.trim() || "Autor do uzupelnienia",
     ocrText: candidate.rawText,
     imageUri: options?.imageUri,
-    status: "needs_review",
+    status: "available",
     createdAt: timestamp,
     updatedAt: timestamp
   };
