@@ -120,8 +120,7 @@ export function LibraryScreen({ onStartScan }: LibraryScreenProps) {
     try {
       await saveBook({
         ...book,
-        ...changes,
-        updatedAt: new Date().toISOString()
+        ...changes
       });
       closeQuickEdit();
     } finally {
