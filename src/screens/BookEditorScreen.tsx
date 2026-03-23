@@ -10,9 +10,15 @@ import {
 } from "react-native";
 
 import { STATUS_OPTIONS } from "@/config/bookUi";
+import { DuplicateResolutionSheet } from "@/components/DuplicateResolutionSheet";
 import { appText } from "@/config/uiText";
 import { PrimaryButton } from "@/components/PrimaryButton";
 import { SectionCard } from "@/components/SectionCard";
+import {
+  DuplicateConflictError,
+  DuplicateMatch,
+  DuplicateSaveResolution
+} from "@/features/catalog/duplicateDetection";
 import {
   RemoteBookMatch,
   searchBooksOnline
@@ -114,6 +120,10 @@ export function BookEditorScreen({
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
+  const [pendingDuplicate, setPendingDuplicate] = useState<{
+    candidateBook: Book;
+    matches: DuplicateMatch[];
+  } | null>(null);
   const { saveBook, deleteBook } = useLibraryStore();
   const { savedLocations } = useSettingsStore();
 
@@ -121,6 +131,7 @@ export function BookEditorScreen({
     setDraft(createDraft(book));
     setSearchResults([]);
     setSearchError(null);
+    setPendingDuplicate(null);
   }, [book]);
 
   const screenTitle = useMemo(
@@ -168,6 +179,12 @@ export function BookEditorScreen({
     }));
   };
 
+  const persistBook = async (candidateBook: Book, resolution?: DuplicateSaveResolution) => {
+    await saveBook(candidateBook, resolution);
+    setPendingDuplicate(null);
+    onSaved();
+  };
+
   const handleSave = async () => {
     if (!draft.title.trim()) {
       Alert.alert(
@@ -178,10 +195,36 @@ export function BookEditorScreen({
     }
 
     setIsSaving(true);
+    const candidateBook = toBook(draft);
 
     try {
-      await saveBook(toBook(draft));
-      onSaved();
+      await persistBook(candidateBook);
+    } catch (error) {
+      if (error instanceof DuplicateConflictError) {
+        setPendingDuplicate({
+          candidateBook,
+          matches: error.matches
+        });
+      } else {
+        Alert.alert(
+          appText.editor.saveErrorTitle,
+          error instanceof Error ? error.message : appText.editor.retryLabel
+        );
+      }
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleDuplicateResolution = async (resolution: DuplicateSaveResolution) => {
+    if (!pendingDuplicate) {
+      return;
+    }
+
+    setIsSaving(true);
+
+    try {
+      await persistBook(pendingDuplicate.candidateBook, resolution);
     } catch (error) {
       Alert.alert(
         appText.editor.saveErrorTitle,
@@ -227,8 +270,9 @@ export function BookEditorScreen({
   };
 
   return (
-    <ScrollView contentContainerStyle={styles.content}>
-      <SectionCard title={screenTitle} subtitle={appText.editor.subtitle}>
+    <>
+      <ScrollView contentContainerStyle={styles.content}>
+        <SectionCard title={screenTitle} subtitle={appText.editor.subtitle}>
         <View style={styles.topActions}>
           <Pressable onPress={onBack} style={styles.secondaryButton}>
             <Text style={styles.secondaryButtonLabel}>{appText.editor.backButton}</Text>
@@ -388,8 +432,26 @@ export function BookEditorScreen({
             disabled={isSaving}
           />
         </View>
-      </SectionCard>
-    </ScrollView>
+        </SectionCard>
+      </ScrollView>
+      <DuplicateResolutionSheet
+        visible={Boolean(pendingDuplicate)}
+        candidateBook={pendingDuplicate?.candidateBook ?? null}
+        matches={pendingDuplicate?.matches ?? []}
+        onOverwrite={(targetBookId) => {
+          void handleDuplicateResolution({ mode: "overwrite", targetBookId });
+        }}
+        onSaveCopy={() => {
+          void handleDuplicateResolution({ mode: "save_as_copy" });
+        }}
+        onReject={() => {
+          setPendingDuplicate(null);
+        }}
+        onCancel={() => {
+          setPendingDuplicate(null);
+        }}
+      />
+    </>
   );
 }
 

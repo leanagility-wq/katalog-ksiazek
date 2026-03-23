@@ -93,6 +93,23 @@ export const appText = {
     confidenceMedium: (value: number) => `Średnia pewność (${value}%)`,
     confidenceLow: (value: number) => `Niska pewność (${value}%)`
   },
+  duplicates: {
+    title: "Wykryto duplikat",
+    subtitle:
+      "Ta książka wygląda na duplikat istniejącego wpisu. Wybierz, co chcesz z nią zrobić.",
+    currentBook: "Nowy lub edytowany wpis",
+    matchesTitle: "Podobne wpisy w katalogu",
+    overwriteButton: "Nadpisz ten wpis",
+    saveCopyButton: "Dodaj jako osobną kopię",
+    rejectButton: "Odrzuć duplikat",
+    cancelButton: "Anuluj",
+    existingLocationFallback: "Brak lokalizacji",
+    existingAuthorFallback: "Autor do uzupełnienia",
+    existingTitleFallback: "Bez tytułu",
+    existingStatusLabel: "Status",
+    existingLocationLabel: "Lokalizacja",
+    existingReasonLabel: "Powód dopasowania"
+  },
   export: {
     title: "Eksport danych",
     subtitle:

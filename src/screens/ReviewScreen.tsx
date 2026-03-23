@@ -2,10 +2,17 @@ import { useEffect, useMemo, useState } from "react";
 import { ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 
 import { appText } from "@/config/uiText";
+import { DuplicateResolutionSheet } from "@/components/DuplicateResolutionSheet";
 import { PrimaryButton } from "@/components/PrimaryButton";
 import { SectionCard } from "@/components/SectionCard";
+import {
+  DuplicateConflictError,
+  DuplicateMatch,
+  DuplicateSaveResolution
+} from "@/features/catalog/duplicateDetection";
 import { mapCandidateToBook } from "@/features/scanning/scanMapper";
 import { useLibraryStore } from "@/store/useLibraryStore";
+import { Book } from "@/types/book";
 import { ScanSession } from "@/types/scan";
 
 interface EditableCandidate {
@@ -51,6 +58,11 @@ export function ReviewScreen({
   const [items, setItems] = useState<EditableCandidate[]>([]);
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [pendingDuplicate, setPendingDuplicate] = useState<{
+    index: number;
+    candidateBook: Book;
+    matches: DuplicateMatch[];
+  } | null>(null);
 
   useEffect(() => {
     setItems(
@@ -65,6 +77,7 @@ export function ReviewScreen({
       }))
     );
     setSaveError(null);
+    setPendingDuplicate(null);
   }, [scanSession]);
 
   const attentionCount = useMemo(
@@ -86,28 +99,101 @@ export function ReviewScreen({
     );
   };
 
+  const toCandidateBook = (item: EditableCandidate) =>
+    mapCandidateToBook(
+      {
+        id: item.id,
+        rawText: item.rawText,
+        titleSuggestion: item.titleSuggestion,
+        authorSuggestion: item.authorSuggestion
+      },
+      {
+        imageUri: scanSession?.imageUri
+      }
+    );
+
+  const continueSaving = async (
+    startIndex: number,
+    resolution?: DuplicateSaveResolution,
+    candidateBookOverride?: Book
+  ) => {
+    for (let index = startIndex; index < items.length; index += 1) {
+      const item = items[index];
+      const candidateBook =
+        index === startIndex && candidateBookOverride
+          ? candidateBookOverride
+          : toCandidateBook(item);
+
+      try {
+        await saveBook(candidateBook, index === startIndex ? resolution : undefined);
+      } catch (error) {
+        if (error instanceof DuplicateConflictError) {
+          setPendingDuplicate({
+            index,
+            candidateBook,
+            matches: error.matches
+          });
+          return;
+        }
+
+        throw error;
+      }
+    }
+
+    setPendingDuplicate(null);
+    onComplete();
+  };
+
   const handleSave = async () => {
     setIsSaving(true);
     setSaveError(null);
 
     try {
-      for (const item of items) {
-        await saveBook(
-          mapCandidateToBook(
-            {
-              id: item.id,
-              rawText: item.rawText,
-              titleSuggestion: item.titleSuggestion,
-              authorSuggestion: item.authorSuggestion
-            },
-            {
-              imageUri: scanSession?.imageUri
-            }
-          )
-        );
-      }
+      await continueSaving(0);
+    } catch (error) {
+      setSaveError(
+        error instanceof Error ? error.message : appText.review.saveError
+      );
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
-      onComplete();
+  const handleDuplicateResolution = async (resolution: DuplicateSaveResolution) => {
+    if (!pendingDuplicate) {
+      return;
+    }
+
+    setIsSaving(true);
+    setSaveError(null);
+
+    try {
+      await continueSaving(
+        pendingDuplicate.index,
+        resolution,
+        pendingDuplicate.candidateBook
+      );
+    } catch (error) {
+      setSaveError(
+        error instanceof Error ? error.message : appText.review.saveError
+      );
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleRejectDuplicate = async () => {
+    if (!pendingDuplicate) {
+      return;
+    }
+
+    const nextIndex = pendingDuplicate.index + 1;
+    setPendingDuplicate(null);
+    setIsSaving(true);
+    setSaveError(null);
+
+    try {
+      await continueSaving(nextIndex);
     } catch (error) {
       setSaveError(
         error instanceof Error ? error.message : appText.review.saveError
@@ -131,82 +217,108 @@ export function ReviewScreen({
   }
 
   return (
-    <ScrollView contentContainerStyle={styles.content}>
-      <SectionCard
-        title={appText.review.title}
-        subtitle={appText.review.subtitle(scanSession.imageLabel, items.length)}
-      >
-        <Text style={styles.helper}>{appText.review.helper}</Text>
-        <Text style={styles.summary}>
-          {appText.review.summary(attentionCount, items.length)}
-        </Text>
-        {scanSession.imageUri ? (
-          <Text style={styles.meta}>{appText.review.imageSource(scanSession.imageUri)}</Text>
-        ) : null}
-        {saveError ? <Text style={styles.error}>{saveError}</Text> : null}
-      </SectionCard>
-
-      {items.map((item, index) => (
+    <>
+      <ScrollView contentContainerStyle={styles.content}>
         <SectionCard
-          key={item.id}
-          title={appText.review.positionTitle(index)}
-          subtitle={appText.review.rawOcr(item.rawText)}
+          title={appText.review.title}
+          subtitle={appText.review.subtitle(scanSession.imageLabel, items.length)}
         >
-          <View style={styles.badgeRow}>
-            <View
-              style={[
-                styles.badge,
-                item.needsAttention ? styles.badgeWarning : styles.badgeOk
-              ]}
-            >
-              <Text
+          <Text style={styles.helper}>{appText.review.helper}</Text>
+          <Text style={styles.summary}>
+            {appText.review.summary(attentionCount, items.length)}
+          </Text>
+          {scanSession.imageUri ? (
+            <Text style={styles.meta}>
+              {appText.review.imageSource(scanSession.imageUri)}
+            </Text>
+          ) : null}
+          {saveError ? <Text style={styles.error}>{saveError}</Text> : null}
+        </SectionCard>
+
+        {items.map((item, index) => (
+          <SectionCard
+            key={item.id}
+            title={appText.review.positionTitle(index)}
+            subtitle={appText.review.rawOcr(item.rawText)}
+          >
+            <View style={styles.badgeRow}>
+              <View
                 style={[
-                  styles.badgeText,
-                  item.needsAttention ? styles.badgeWarningText : styles.badgeOkText
+                  styles.badge,
+                  item.needsAttention ? styles.badgeWarning : styles.badgeOk
                 ]}
               >
-                {item.needsAttention
-                  ? appText.review.needsAttention
-                  : appText.review.looksGood}
-              </Text>
+                <Text
+                  style={[
+                    styles.badgeText,
+                    item.needsAttention ? styles.badgeWarningText : styles.badgeOkText
+                  ]}
+                >
+                  {item.needsAttention
+                    ? appText.review.needsAttention
+                    : appText.review.looksGood}
+                </Text>
+              </View>
+              <Text style={styles.confidence}>{confidenceLabel(item.confidence)}</Text>
             </View>
-            <Text style={styles.confidence}>{confidenceLabel(item.confidence)}</Text>
-          </View>
-          {item.reviewReason ? (
-            <Text style={styles.reviewReason}>{item.reviewReason}</Text>
-          ) : null}
-          <View style={styles.field}>
-            <Text style={styles.label}>{appText.review.titleField}</Text>
-            <TextInput
-              value={item.titleSuggestion}
-              onChangeText={(value) => handleChange(item.id, "titleSuggestion", value)}
-              style={styles.input}
-              placeholder={appText.review.titlePlaceholder}
-              placeholderTextColor="#9a8a76"
-            />
-          </View>
-          <View style={styles.field}>
-            <Text style={styles.label}>{appText.review.authorField}</Text>
-            <TextInput
-              value={item.authorSuggestion}
-              onChangeText={(value) => handleChange(item.id, "authorSuggestion", value)}
-              style={styles.input}
-              placeholder={appText.review.authorPlaceholder}
-              placeholderTextColor="#9a8a76"
-            />
-          </View>
-        </SectionCard>
-      ))}
+            {item.reviewReason ? (
+              <Text style={styles.reviewReason}>{item.reviewReason}</Text>
+            ) : null}
+            <View style={styles.field}>
+              <Text style={styles.label}>{appText.review.titleField}</Text>
+              <TextInput
+                value={item.titleSuggestion}
+                onChangeText={(value) =>
+                  handleChange(item.id, "titleSuggestion", value)
+                }
+                style={styles.input}
+                placeholder={appText.review.titlePlaceholder}
+                placeholderTextColor="#9a8a76"
+              />
+            </View>
+            <View style={styles.field}>
+              <Text style={styles.label}>{appText.review.authorField}</Text>
+              <TextInput
+                value={item.authorSuggestion}
+                onChangeText={(value) =>
+                  handleChange(item.id, "authorSuggestion", value)
+                }
+                style={styles.input}
+                placeholder={appText.review.authorPlaceholder}
+                placeholderTextColor="#9a8a76"
+              />
+            </View>
+          </SectionCard>
+        ))}
 
-      <View style={styles.actions}>
-        <PrimaryButton label={appText.review.backToScanShort} onPress={onCancel} />
-        <PrimaryButton
-          label={isSaving ? appText.review.savingButton : appText.review.saveButton}
-          onPress={() => void handleSave()}
-          disabled={isSaving || items.length === 0}
-        />
-      </View>
-    </ScrollView>
+        <View style={styles.actions}>
+          <PrimaryButton label={appText.review.backToScanShort} onPress={onCancel} />
+          <PrimaryButton
+            label={isSaving ? appText.review.savingButton : appText.review.saveButton}
+            onPress={() => void handleSave()}
+            disabled={isSaving || items.length === 0}
+          />
+        </View>
+      </ScrollView>
+      <DuplicateResolutionSheet
+        visible={Boolean(pendingDuplicate)}
+        candidateBook={pendingDuplicate?.candidateBook ?? null}
+        matches={pendingDuplicate?.matches ?? []}
+        onOverwrite={(targetBookId) => {
+          void handleDuplicateResolution({ mode: "overwrite", targetBookId });
+        }}
+        onSaveCopy={() => {
+          void handleDuplicateResolution({ mode: "save_as_copy" });
+        }}
+        onReject={() => {
+          void handleRejectDuplicate();
+        }}
+        onCancel={() => {
+          setPendingDuplicate(null);
+          setIsSaving(false);
+        }}
+      />
+    </>
   );
 }
 
