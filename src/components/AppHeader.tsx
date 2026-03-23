@@ -4,7 +4,7 @@ export function AppHeader() {
   return (
     <View style={styles.header}>
       <Text style={styles.eyebrow}>Domowa biblioteka</Text>
-      <Text style={styles.title}>Katalog ksi\u0105\u017cek</Text>
+      <Text style={styles.title}>Katalog książek</Text>
     </View>
   );
 }

@@ -12,6 +12,10 @@ interface LibraryState {
   deleteBook: (id: string) => Promise<void>;
 }
 
+function toLibraryError(error: unknown, fallbackMessage: string) {
+  return error instanceof Error ? error : new Error(fallbackMessage);
+}
+
 export const useLibraryStore = create<LibraryState>((set) => ({
   books: [],
   isLoading: false,
@@ -23,13 +27,17 @@ export const useLibraryStore = create<LibraryState>((set) => ({
       const books = await bookRepository.list();
       set({ books, isLoading: false });
     } catch (error) {
+      const resolvedError = toLibraryError(
+        error,
+        "Nie udało się załadować katalogu."
+      );
+
       set({
         isLoading: false,
-        errorMessage:
-          error instanceof Error
-            ? error.message
-            : "Nie uda\u0142o si\u0119 za\u0142adowa\u0107 katalogu."
+        errorMessage: resolvedError.message
       });
+
+      throw resolvedError;
     }
   },
   saveBook: async (book) => {
@@ -38,12 +46,16 @@ export const useLibraryStore = create<LibraryState>((set) => ({
       const books = await bookRepository.list();
       set({ books, errorMessage: null });
     } catch (error) {
+      const resolvedError = toLibraryError(
+        error,
+        "Nie udało się zapisać książki."
+      );
+
       set({
-        errorMessage:
-          error instanceof Error
-            ? error.message
-            : "Nie uda\u0142o si\u0119 zapisa\u0107 ksi\u0105\u017cki."
+        errorMessage: resolvedError.message
       });
+
+      throw resolvedError;
     }
   },
   deleteBook: async (id) => {
@@ -52,12 +64,16 @@ export const useLibraryStore = create<LibraryState>((set) => ({
       const books = await bookRepository.list();
       set({ books, errorMessage: null });
     } catch (error) {
+      const resolvedError = toLibraryError(
+        error,
+        "Nie udało się usunąć książki."
+      );
+
       set({
-        errorMessage:
-          error instanceof Error
-            ? error.message
-            : "Nie uda\u0142o si\u0119 usun\u0105\u0107 ksi\u0105\u017cki."
+        errorMessage: resolvedError.message
       });
+
+      throw resolvedError;
     }
   }
 }));

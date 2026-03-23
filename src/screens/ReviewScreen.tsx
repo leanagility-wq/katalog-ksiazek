@@ -29,14 +29,14 @@ function confidenceLabel(confidence?: number) {
   }
 
   if (confidence >= 0.82) {
-    return `Wysoka pewno\u015b\u0107 (${Math.round(confidence * 100)}%)`;
+    return `Wysoka pewność (${Math.round(confidence * 100)}%)`;
   }
 
   if (confidence >= 0.6) {
-    return `\u015arednia pewno\u015b\u0107 (${Math.round(confidence * 100)}%)`;
+    return `Średnia pewność (${Math.round(confidence * 100)}%)`;
   }
 
-  return `Niska pewno\u015b\u0107 (${Math.round(confidence * 100)}%)`;
+  return `Niska pewność (${Math.round(confidence * 100)}%)`;
 }
 
 export function ReviewScreen({
@@ -47,6 +47,7 @@ export function ReviewScreen({
   const { saveBook } = useLibraryStore();
   const [items, setItems] = useState<EditableCandidate[]>([]);
   const [isSaving, setIsSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   useEffect(() => {
     setItems(
@@ -60,6 +61,7 @@ export function ReviewScreen({
         reviewReason: candidate.reviewReason
       }))
     );
+    setSaveError(null);
   }, [scanSession]);
 
   const attentionCount = useMemo(
@@ -83,6 +85,7 @@ export function ReviewScreen({
 
   const handleSave = async () => {
     setIsSaving(true);
+    setSaveError(null);
 
     try {
       for (const item of items) {
@@ -102,6 +105,10 @@ export function ReviewScreen({
       }
 
       onComplete();
+    } catch (error) {
+      setSaveError(
+        error instanceof Error ? error.message : "Nie udało się zapisać książek."
+      );
     } finally {
       setIsSaving(false);
     }
@@ -111,10 +118,12 @@ export function ReviewScreen({
     return (
       <ScrollView contentContainerStyle={styles.content}>
         <SectionCard
-          title="Przegl\u0105d OCR"
-          subtitle="Nie ma jeszcze aktywnego skanu. Najpierw przejd\u017a do ekranu skanowania."
+          title={"Przegląd OCR"}
+          subtitle={
+            "Nie ma jeszcze aktywnego skanu. Najpierw przejdź do ekranu skanowania."
+          }
         >
-          <PrimaryButton label="Wr\u00f3\u0107 do skanowania" onPress={onCancel} />
+          <PrimaryButton label={"Wróć do skanowania"} onPress={onCancel} />
         </SectionCard>
       </ScrollView>
     );
@@ -123,20 +132,20 @@ export function ReviewScreen({
   return (
     <ScrollView contentContainerStyle={styles.content}>
       <SectionCard
-        title="Przegl\u0105d OCR"
+        title={"Przegląd OCR"}
         subtitle={`Skan: ${scanSession.imageLabel}. Rozpoznane pozycje: ${items.length}`}
       >
         <Text style={styles.helper}>
-          Sprawd\u017a przede wszystkim wpisy oznaczone do uwagi. To one najcz\u0119\u015bciej wymagaj\u0105 r\u0119cznej korekty.
+          Sprawdź przede wszystkim wpisy oznaczone do uwagi. To one najczęściej
+          wymagają ręcznej korekty.
         </Text>
         <Text style={styles.summary}>
           Wymaga uwagi: {attentionCount} z {items.length}
         </Text>
         {scanSession.imageUri ? (
-          <Text style={styles.meta}>
-            \u0179r\u00f3d\u0142o obrazu: {scanSession.imageUri}
-          </Text>
+          <Text style={styles.meta}>{`Źródło obrazu: ${scanSession.imageUri}`}</Text>
         ) : null}
+        {saveError ? <Text style={styles.error}>{saveError}</Text> : null}
       </SectionCard>
 
       {items.map((item, index) => (
@@ -158,7 +167,7 @@ export function ReviewScreen({
                   item.needsAttention ? styles.badgeWarningText : styles.badgeOkText
                 ]}
               >
-                {item.needsAttention ? "Sprawd\u017a r\u0119cznie" : "Wygl\u0105da dobrze"}
+                {item.needsAttention ? "Sprawdź ręcznie" : "Wygląda dobrze"}
               </Text>
             </View>
             <Text style={styles.confidence}>{confidenceLabel(item.confidence)}</Text>
@@ -167,12 +176,12 @@ export function ReviewScreen({
             <Text style={styles.reviewReason}>{item.reviewReason}</Text>
           ) : null}
           <View style={styles.field}>
-            <Text style={styles.label}>Tytu\u0142</Text>
+            <Text style={styles.label}>Tytuł</Text>
             <TextInput
               value={item.titleSuggestion}
               onChangeText={(value) => handleChange(item.id, "titleSuggestion", value)}
               style={styles.input}
-              placeholder="Tytu\u0142 ksi\u0105\u017cki"
+              placeholder={"Tytuł książki"}
               placeholderTextColor="#9a8a76"
             />
           </View>
@@ -182,7 +191,7 @@ export function ReviewScreen({
               value={item.authorSuggestion}
               onChangeText={(value) => handleChange(item.id, "authorSuggestion", value)}
               style={styles.input}
-              placeholder="Autor"
+              placeholder={"Autor"}
               placeholderTextColor="#9a8a76"
             />
           </View>
@@ -190,7 +199,7 @@ export function ReviewScreen({
       ))}
 
       <View style={styles.actions}>
-        <PrimaryButton label="Wr\u00f3\u0107 do skanu" onPress={onCancel} />
+        <PrimaryButton label={"Wróć do skanu"} onPress={onCancel} />
         <PrimaryButton
           label={isSaving ? "Zapisywanie..." : "Zapisz w katalogu"}
           onPress={() => void handleSave()}
@@ -220,6 +229,10 @@ const styles = StyleSheet.create({
     color: "#7d6240",
     lineHeight: 20,
     fontSize: 12
+  },
+  error: {
+    color: "#8f2f2f",
+    lineHeight: 20
   },
   badgeRow: {
     flexDirection: "row",

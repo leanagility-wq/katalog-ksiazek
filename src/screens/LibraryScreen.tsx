@@ -22,7 +22,7 @@ interface LibraryScreenProps {
 
 const SORT_OPTIONS: Array<{ key: SortKey; label: string }> = [
   { key: "updated_desc", label: "Ostatnio zmienione" },
-  { key: "title_asc", label: "Tytu\u0142 A-Z" },
+  { key: "title_asc", label: "Tytuł A-Z" },
   { key: "author_asc", label: "Autor A-Z" },
   { key: "status_asc", label: "Status" }
 ];
@@ -90,23 +90,18 @@ export function LibraryScreen({ onStartScan }: LibraryScreenProps) {
   return (
     <ScrollView contentContainerStyle={styles.content}>
       <SectionCard
-        title={"Katalog"}
+        title="Katalog"
         subtitle={
-          isLoading
-            ? "\u0141adowanie biblioteki..."
-            : `Pozycji w katalogu: ${books.length}`
+          isLoading ? "Ładowanie biblioteki..." : `Pozycji w katalogu: ${books.length}`
         }
       >
         <View style={styles.heroActions}>
           <View style={styles.heroAction}>
-            <PrimaryButton
-              label={"Zeskanuj now\u0105 p\u00f3\u0142k\u0119"}
-              onPress={onStartScan}
-            />
+            <PrimaryButton label="Zeskanuj nową półkę" onPress={onStartScan} />
           </View>
           <View style={styles.heroAction}>
             <PrimaryButton
-              label={"Dodaj r\u0119cznie"}
+              label="Dodaj ręcznie"
               onPress={() => {
                 setIsCreating(true);
               }}
@@ -117,10 +112,8 @@ export function LibraryScreen({ onStartScan }: LibraryScreenProps) {
       </SectionCard>
 
       <SectionCard
-        title={"Przegl\u0105daj i poprawiaj"}
-        subtitle={
-          "Otw\u00f3rz ksi\u0105\u017ck\u0119, aby dopisa\u0107 dane, wyszuka\u0107 metadane online albo usun\u0105\u0107 wpis."
-        }
+        title="Przeglądaj i poprawiaj"
+        subtitle="Otwórz książkę, aby dopisać dane, wyszukać metadane online albo usunąć wpis."
       >
         <TextInput
           value={query}
@@ -162,11 +155,10 @@ export function LibraryScreen({ onStartScan }: LibraryScreenProps) {
             ))
           ) : (
             <View style={styles.emptyState}>
-              <Text style={styles.emptyTitle}>
-                Nie ma jeszcze pasuj\u0105cych ksi\u0105\u017cek.
-              </Text>
+              <Text style={styles.emptyTitle}>Nie ma jeszcze pasujących książek.</Text>
               <Text style={styles.emptyText}>
-                Zeskanuj p\u00f3\u0142k\u0119 albo dodaj tytu\u0142 r\u0119cznie, a potem uzupe\u0142nij szczeg\u00f3\u0142y z sieci.
+                Zeskanuj półkę albo dodaj tytuł ręcznie, a potem uzupełnij
+                szczegóły z sieci.
               </Text>
             </View>
           )}
@@ -174,22 +166,19 @@ export function LibraryScreen({ onStartScan }: LibraryScreenProps) {
       </SectionCard>
 
       <SectionCard
-        title={"Jak to dzia\u0142a"}
-        subtitle={"Najwygodniejszy spos\u00f3b pracy z katalogiem na telefonie."}
+        title="Jak to działa"
+        subtitle="Najwygodniejszy sposób pracy z katalogiem na telefonie."
       >
+        <Text style={styles.listItem}>1. Zeskanuj półkę albo dodaj książkę ręcznie.</Text>
         <Text style={styles.listItem}>
-          {"1. Zeskanuj p\u00f3\u0142k\u0119 albo dodaj ksi\u0105\u017ck\u0119 r\u0119cznie."}
+          2. Otwórz wpis i popraw tytuł, autora, lokalizację albo status.
         </Text>
         <Text style={styles.listItem}>
-          {"2. Otw\u00f3rz wpis i popraw tytu\u0142, autora, lokalizacj\u0119 albo status."}
+          3. Użyj przycisku "Wyszukaj w sieci", gdy chcesz dobrać ISBN lub lepsze
+          metadane.
         </Text>
         <Text style={styles.listItem}>
-          {
-            "3. U\u017cyj przycisku \"Wyszukaj w sieci\", gdy chcesz dobra\u0107 ISBN lub lepsze metadane."
-          }
-        </Text>
-        <Text style={styles.listItem}>
-          {"4. W razie potrzeby usu\u0144 wpis jednym przyciskiem z poziomu edycji."}
+          4. W razie potrzeby usuń wpis jednym przyciskiem z poziomu edycji.
         </Text>
       </SectionCard>
     </ScrollView>

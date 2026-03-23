@@ -40,9 +40,9 @@ interface BookEditorScreenProps {
 }
 
 const STATUS_OPTIONS: Array<{ key: BookStatus; label: string }> = [
-  { key: "available", label: "Dost\u0119pna" },
-  { key: "borrowed", label: "Po\u017cyczona" },
-  { key: "for_sale", label: "Na sprzeda\u017c" },
+  { key: "available", label: "Dostępna" },
+  { key: "borrowed", label: "Pożyczona" },
+  { key: "for_sale", label: "Na sprzedaż" },
   { key: "sold", label: "Sprzedana" },
   { key: "needs_review", label: "Do poprawy" }
 ];
@@ -128,7 +128,7 @@ export function BookEditorScreen({
   }, [book]);
 
   const screenTitle = useMemo(
-    () => (book ? "Edytuj ksi\u0105\u017ck\u0119" : "Dodaj ksi\u0105\u017ck\u0119"),
+    () => (book ? "Edytuj książkę" : "Dodaj książkę"),
     [book]
   );
 
@@ -151,11 +151,11 @@ export function BookEditorScreen({
       setSearchResults(results);
 
       if (!results.length) {
-        setSearchError("Nie znaleziono podobnych tytu\u0142\u00f3w.");
+        setSearchError("Nie znaleziono podobnych tytułów.");
       }
     } catch (error) {
       setSearchError(
-        error instanceof Error ? error.message : "Nie uda\u0142o si\u0119 pobra\u0107 wynik\u00f3w."
+        error instanceof Error ? error.message : "Nie udało się pobrać wyników."
       );
       setSearchResults([]);
     } finally {
@@ -174,10 +174,7 @@ export function BookEditorScreen({
 
   const handleSave = async () => {
     if (!draft.title.trim()) {
-      Alert.alert(
-        "Brakuje tytu\u0142u",
-        "Uzupe\u0142nij tytu\u0142 przed zapisem."
-      );
+      Alert.alert("Brakuje tytułu", "Uzupełnij tytuł przed zapisem.");
       return;
     }
 
@@ -186,6 +183,11 @@ export function BookEditorScreen({
     try {
       await saveBook(toBook(draft));
       onSaved();
+    } catch (error) {
+      Alert.alert(
+        "Nie udało się zapisać książki",
+        error instanceof Error ? error.message : "Spróbuj ponownie."
+      );
     } finally {
       setIsSaving(false);
     }
@@ -197,40 +199,39 @@ export function BookEditorScreen({
       return;
     }
 
-    Alert.alert(
-      "Usun\u0105\u0107 ksi\u0105\u017ck\u0119?",
-      "Ta operacja usunie wpis z katalogu.",
-      [
-        { text: "Anuluj", style: "cancel" },
-        {
-          text: "Usu\u0144",
-          style: "destructive",
-          onPress: async () => {
-            setIsDeleting(true);
+    Alert.alert("Usunąć książkę?", "Ta operacja usunie wpis z katalogu.", [
+      { text: "Anuluj", style: "cancel" },
+      {
+        text: "Usuń",
+        style: "destructive",
+        onPress: async () => {
+          setIsDeleting(true);
 
-            try {
-              await deleteBook(book.id);
-              onSaved();
-            } finally {
-              setIsDeleting(false);
-            }
+          try {
+            await deleteBook(book.id);
+            onSaved();
+          } catch (error) {
+            Alert.alert(
+              "Nie udało się usunąć książki",
+              error instanceof Error ? error.message : "Spróbuj ponownie."
+            );
+          } finally {
+            setIsDeleting(false);
           }
         }
-      ]
-    );
+      }
+    ]);
   };
 
   return (
     <ScrollView contentContainerStyle={styles.content}>
       <SectionCard
         title={screenTitle}
-        subtitle={
-          "Uzupe\u0142nij dane r\u0119cznie albo podpowiedz je wyszukiwaniem online."
-        }
+        subtitle="Uzupełnij dane ręcznie albo podpowiedz je wyszukiwaniem online."
       >
         <View style={styles.topActions}>
           <Pressable onPress={onBack} style={styles.secondaryButton}>
-            <Text style={styles.secondaryButtonLabel}>Wr\u00f3\u0107</Text>
+            <Text style={styles.secondaryButtonLabel}>Wróć</Text>
           </Pressable>
           <Pressable
             onPress={handleDelete}
@@ -240,14 +241,14 @@ export function BookEditorScreen({
             <Text
               style={[styles.secondaryButtonLabel, styles.dangerButtonLabel]}
             >
-              {book ? (isDeleting ? "Usuwanie..." : "Usu\u0144") : "Anuluj"}
+              {book ? (isDeleting ? "Usuwanie..." : "Usuń") : "Anuluj"}
             </Text>
           </Pressable>
         </View>
 
         <View style={styles.form}>
           <Field
-            label="Tytu\u0142"
+            label="Tytuł"
             value={draft.title}
             onChangeText={(value) => updateDraft("title", value)}
             placeholder="Np. Lalka"
@@ -256,7 +257,7 @@ export function BookEditorScreen({
             label="Autor"
             value={draft.author}
             onChangeText={(value) => updateDraft("author", value)}
-            placeholder="Np. Boles\u0142aw Prus"
+            placeholder="Np. Bolesław Prus"
           />
           <View style={styles.inlineActions}>
             <PrimaryButton
@@ -267,9 +268,7 @@ export function BookEditorScreen({
               disabled={isSearching}
             />
           </View>
-          {searchError ? (
-            <Text style={styles.helperError}>{searchError}</Text>
-          ) : null}
+          {searchError ? <Text style={styles.helperError}>{searchError}</Text> : null}
           {searchResults.length ? (
             <View style={styles.searchResults}>
               {searchResults.map((result) => (
@@ -300,7 +299,7 @@ export function BookEditorScreen({
             label="Lokalizacja"
             value={draft.shelfLocation}
             onChangeText={(value) => updateDraft("shelfLocation", value)}
-            placeholder="Np. Salon / P\u00f3\u0142ka A"
+            placeholder="Np. Salon / Półka A"
           />
           <Field
             label="Cena"
@@ -310,7 +309,7 @@ export function BookEditorScreen({
             keyboardType="decimal-pad"
           />
           <Field
-            label="Po\u017cyczona komu"
+            label="Pożyczona komu"
             value={draft.borrowedTo}
             onChangeText={(value) => updateDraft("borrowedTo", value)}
             placeholder="Opcjonalnie"
