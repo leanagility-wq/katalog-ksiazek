@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 
 import { appText } from "@/config/uiText";
@@ -6,17 +6,31 @@ import { PrimaryButton } from "@/components/PrimaryButton";
 import { SectionCard } from "@/components/SectionCard";
 import { useSettingsStore } from "@/store/useSettingsStore";
 
+function locationsToDraft(locations: string[]) {
+  return locations.join("\n");
+}
+
+function draftToLocations(value: string) {
+  return value
+    .split(/\r?\n/)
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
 export function SettingsScreen() {
   const {
     openAIApiKey,
+    savedLocations,
     isLoaded,
     isSaving,
     errorMessage,
     loadSettings,
     saveOpenAIApiKey,
-    clearOpenAIApiKey
+    clearOpenAIApiKey,
+    saveSavedLocations
   } = useSettingsStore();
   const [draftApiKey, setDraftApiKey] = useState("");
+  const [draftLocations, setDraftLocations] = useState("");
   const [infoMessage, setInfoMessage] = useState<string | null>(null);
 
   useEffect(() => {
@@ -29,7 +43,16 @@ export function SettingsScreen() {
     setDraftApiKey(openAIApiKey);
   }, [openAIApiKey]);
 
-  const handleSave = async () => {
+  useEffect(() => {
+    setDraftLocations(locationsToDraft(savedLocations));
+  }, [savedLocations]);
+
+  const normalizedLocationCount = useMemo(
+    () => draftToLocations(draftLocations).length,
+    [draftLocations]
+  );
+
+  const handleSaveApiKey = async () => {
     await saveOpenAIApiKey(draftApiKey);
     setInfoMessage(appText.settings.savedInfo);
   };
@@ -38,6 +61,11 @@ export function SettingsScreen() {
     await clearOpenAIApiKey();
     setDraftApiKey("");
     setInfoMessage(appText.settings.clearedInfo);
+  };
+
+  const handleSaveLocations = async () => {
+    await saveSavedLocations(draftToLocations(draftLocations));
+    setInfoMessage(appText.settings.locationsSavedInfo);
   };
 
   return (
@@ -68,7 +96,7 @@ export function SettingsScreen() {
                 ? appText.settings.savingButton
                 : appText.settings.saveButton
             }
-            onPress={() => void handleSave()}
+            onPress={() => void handleSaveApiKey()}
             disabled={isSaving || draftApiKey.trim().length === 0}
           />
           <PrimaryButton
@@ -80,6 +108,35 @@ export function SettingsScreen() {
           />
         </View>
       </SectionCard>
+
+      <SectionCard
+        title={appText.settings.locationsTitle}
+        subtitle={appText.settings.locationsSubtitle}
+      >
+        <View style={styles.field}>
+          <Text style={styles.label}>
+            {appText.settings.locationsLabel} ({normalizedLocationCount})
+          </Text>
+          <TextInput
+            value={draftLocations}
+            onChangeText={setDraftLocations}
+            style={[styles.input, styles.multilineInput]}
+            placeholder={appText.settings.locationsPlaceholder}
+            placeholderTextColor="#9a8a76"
+            multiline
+            textAlignVertical="top"
+          />
+        </View>
+        <PrimaryButton
+          label={
+            isSaving
+              ? appText.settings.savingButton
+              : appText.settings.saveLocationsButton
+          }
+          onPress={() => void handleSaveLocations()}
+          disabled={isSaving}
+        />
+      </SectionCard>
     </ScrollView>
   );
 }
@@ -88,7 +145,8 @@ const styles = StyleSheet.create({
   content: {
     paddingHorizontal: 16,
     paddingTop: 10,
-    paddingBottom: 18
+    paddingBottom: 18,
+    gap: 12
   },
   field: {
     gap: 6
@@ -105,6 +163,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 10,
     color: "#2d2419"
+  },
+  multilineInput: {
+    minHeight: 140
   },
   helper: {
     color: "#5d4b39",

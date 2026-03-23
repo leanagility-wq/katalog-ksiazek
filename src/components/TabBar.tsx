@@ -30,7 +30,12 @@ export function TabBar({ activeTab, onChange }: TabBarProps) {
               onPress={() => onChange(tab.key)}
               style={[styles.item, isActive ? styles.itemActive : null]}
             >
-              <Text style={[styles.label, isActive ? styles.labelActive : null]}>
+              <Text
+                numberOfLines={1}
+                adjustsFontSizeToFit
+                minimumFontScale={0.8}
+                style={[styles.label, isActive ? styles.labelActive : null]}
+              >
                 {tab.label}
               </Text>
             </Pressable>
@@ -78,7 +83,8 @@ const styles = StyleSheet.create({
   label: {
     color: "#6f5a42",
     fontWeight: "600",
-    fontSize: 12
+    fontSize: 11,
+    lineHeight: 13
   },
   labelActive: {
     color: "#3e2f1f"

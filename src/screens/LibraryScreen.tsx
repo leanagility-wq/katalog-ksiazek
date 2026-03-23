@@ -15,6 +15,7 @@ import { PrimaryButton } from "@/components/PrimaryButton";
 import { SectionCard } from "@/components/SectionCard";
 import { BookEditorScreen } from "@/screens/BookEditorScreen";
 import { useLibraryStore } from "@/store/useLibraryStore";
+import { useSettingsStore } from "@/store/useSettingsStore";
 import { Book, BookStatus } from "@/types/book";
 
 type QuickEditMode = "status" | "location" | null;
@@ -25,6 +26,7 @@ interface LibraryScreenProps {
 
 export function LibraryScreen({ onStartScan }: LibraryScreenProps) {
   const { books, isLoading, errorMessage, saveBook } = useLibraryStore();
+  const { savedLocations } = useSettingsStore();
   const [sortKey, setSortKey] = useState<SortKey>("updated_desc");
   const [query, setQuery] = useState("");
   const [selectedBookId, setSelectedBookId] = useState<string | null>(null);
@@ -42,12 +44,12 @@ export function LibraryScreen({ onStartScan }: LibraryScreenProps) {
     () =>
       Array.from(
         new Set(
-          books
-            .map((book) => book.shelfLocation?.trim())
-            .filter((value): value is string => Boolean(value))
+          [...savedLocations, ...books.map((book) => book.shelfLocation ?? "")]
+            .map((value) => value.trim())
+            .filter(Boolean)
         )
       ).sort((left, right) => left.localeCompare(right, "pl")),
-    [books]
+    [books, savedLocations]
   );
 
   const visibleBooks = useMemo(() => {
@@ -93,7 +95,10 @@ export function LibraryScreen({ onStartScan }: LibraryScreenProps) {
     setQuickEditMode(null);
   };
 
-  const handleQuickEditToggle = (bookId: string, mode: Exclude<QuickEditMode, null>) => {
+  const handleQuickEditToggle = (
+    bookId: string,
+    mode: Exclude<QuickEditMode, null>
+  ) => {
     if (quickEditBookId === bookId && quickEditMode === mode) {
       closeQuickEdit();
       return;

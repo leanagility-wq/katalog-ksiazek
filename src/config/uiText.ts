@@ -155,6 +155,13 @@ export const appText = {
       "Po zapisaniu skan wyśle zdjęcie półki do modelu wizji i zwróci listę rozpoznanych książek do korekty.",
     savedInfo: "Klucz API zapisany lokalnie w SecureStore.",
     clearedInfo: "Klucz API został usunięty z urządzenia.",
+    locationsTitle: "Zapisane lokalizacje",
+    locationsSubtitle:
+      "Wpisz lokalizacje po jednej w każdej linii. Później będą dostępne w szybkiej edycji książek.",
+    locationsLabel: "Lista lokalizacji",
+    locationsPlaceholder: "Salon / Półka A\nGabinet / Regał 2\nSypialnia / Szafka",
+    locationsSavedInfo: "Lista lokalizacji została zapisana.",
+    saveLocationsButton: "Zapisz lokalizacje",
     saveButton: "Zapisz klucz API",
     savingButton: "Zapisywanie...",
     clearButton: "Usuń klucz z telefonu",
