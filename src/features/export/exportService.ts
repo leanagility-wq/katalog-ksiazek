@@ -1,6 +1,8 @@
 import { Book } from "@/types/book";
+import { normalizeStoredText } from "@/utils/text";
 
-const csvEscape = (value: string) => `"${value.replaceAll("\"", "\"\"")}"`;
+const csvEscape = (value: string) =>
+  `"${normalizeStoredText(value)?.replaceAll("\"", "\"\"") ?? ""}"`;
 
 export const exportBooksToCsv = (books: Book[]) => {
   const header = [
@@ -37,7 +39,8 @@ export const exportBooksToCsv = (books: Book[]) => {
       .join(",")
   );
 
-  return [header.join(","), ...rows].join("\n");
+  // BOM pomaga Excelowi poprawnie odczytać polskie znaki w CSV.
+  return `\uFEFF${[header.join(","), ...rows].join("\n")}`;
 };
 
 export const exportBooksToJson = (books: Book[]) =>

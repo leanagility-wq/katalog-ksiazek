@@ -20,7 +20,9 @@ Aplikacja na Androida ma pomagac w katalogowaniu ksiazek na podstawie OCR z grzb
 - `TypeScript` dla bezpieczniejszego rozwoju
 - `zustand` dla lekkiego stanu aplikacji
 - `SQLite` jako lokalna baza danych offline-first
-- `ML Kit Text Recognition` jako docelowy silnik OCR na Androidzie
+- `OpenAI Responses API` jako glowna warstwa OCR obrazu polki
+- `expo-secure-store` do lokalnego trzymania klucza API uzytkownika
+- `@react-native-ml-kit/text-recognition` jako fallback lokalny
 - `expo-file-system` do eksportu plikow
 
 ## Moduly
@@ -77,6 +79,9 @@ Minimalny zestaw:
 - lista ksiazek z danych testowych
 - przygotowany model danych
 - przygotowany eksport do tekstu
+- dolna nawigacja aplikacji
+- ekran skanowania z kamera i mockiem OCR
+- ekran review do korekty rozpoznanych pozycji
 
 ### Etap 2
 
@@ -84,6 +89,7 @@ Minimalny zestaw:
 - zapis zdjecia
 - integracja z OCR
 - ekran zatwierdzenia wynikow
+- fallback na dane testowe, gdy natywny OCR nie jest jeszcze dostepny
 
 ### Etap 3
 

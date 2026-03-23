@@ -11,8 +11,13 @@
     "android": {
       "package": "pl.katalogksiazek.mobile",
       "permissions": [
-        "CAMERA"
+        "CAMERA",
+        "INTERNET"
       ]
-    }
+    },
+    "plugins": [
+      "expo-sqlite",
+      "expo-secure-store"
+    ]
   }
 }

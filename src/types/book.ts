@@ -27,6 +27,8 @@ export interface ScanCandidate {
   titleSuggestion: string;
   authorSuggestion?: string;
   confidence?: number;
+  needsAttention?: boolean;
+  reviewReason?: string;
   boundingBox?: {
     x: number;
     y: number;

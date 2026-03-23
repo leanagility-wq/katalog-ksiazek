@@ -1,28 +1,88 @@
-import { mockBooks } from "@/data/mockBooks";
 import { Book } from "@/types/book";
+import { getDatabase } from "@/storage/database";
+import { normalizeStoredText } from "@/utils/text";
 
 export interface BookRepository {
   list(): Promise<Book[]>;
   save(book: Book): Promise<void>;
 }
 
-class InMemoryBookRepository implements BookRepository {
-  private books = [...mockBooks];
-
+class SQLiteBookRepository implements BookRepository {
   async list() {
-    return this.books;
+    const db = await getDatabase();
+
+    return db.getAllAsync<Book>(
+      `
+        SELECT
+          id,
+          title,
+          author,
+          isbn,
+          shelfLocation,
+          imageUri,
+          ocrText,
+          price,
+          borrowedTo,
+          notes,
+          status,
+          createdAt,
+          updatedAt
+        FROM books
+        ORDER BY datetime(updatedAt) DESC, rowid DESC
+      `
+    );
   }
 
   async save(book: Book) {
-    const index = this.books.findIndex((entry) => entry.id === book.id);
+    const db = await getDatabase();
+    const normalizedBook: Book = {
+      ...book,
+      title: normalizeStoredText(book.title) ?? "",
+      author: normalizeStoredText(book.author) ?? "",
+      isbn: normalizeStoredText(book.isbn),
+      shelfLocation: normalizeStoredText(book.shelfLocation),
+      imageUri: normalizeStoredText(book.imageUri),
+      ocrText: normalizeStoredText(book.ocrText) ?? "",
+      borrowedTo: normalizeStoredText(book.borrowedTo),
+      notes: normalizeStoredText(book.notes)
+    };
 
-    if (index >= 0) {
-      this.books[index] = book;
-      return;
-    }
-
-    this.books.unshift(book);
+    await db.runAsync(
+      `
+        INSERT INTO books (
+          id, title, author, isbn, shelfLocation, imageUri, ocrText,
+          price, borrowedTo, notes, status, createdAt, updatedAt
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(id) DO UPDATE SET
+          title = excluded.title,
+          author = excluded.author,
+          isbn = excluded.isbn,
+          shelfLocation = excluded.shelfLocation,
+          imageUri = excluded.imageUri,
+          ocrText = excluded.ocrText,
+          price = excluded.price,
+          borrowedTo = excluded.borrowedTo,
+          notes = excluded.notes,
+          status = excluded.status,
+          createdAt = excluded.createdAt,
+          updatedAt = excluded.updatedAt
+      `,
+      normalizedBook.id,
+      normalizedBook.title,
+      normalizedBook.author,
+      normalizedBook.isbn ?? null,
+      normalizedBook.shelfLocation ?? null,
+      normalizedBook.imageUri ?? null,
+      normalizedBook.ocrText,
+      normalizedBook.price ?? null,
+      normalizedBook.borrowedTo ?? null,
+      normalizedBook.notes ?? null,
+      normalizedBook.status,
+      normalizedBook.createdAt,
+      normalizedBook.updatedAt
+    );
   }
 }
 
-export const bookRepository: BookRepository = new InMemoryBookRepository();
+export const bookRepository: BookRepository = new SQLiteBookRepository();

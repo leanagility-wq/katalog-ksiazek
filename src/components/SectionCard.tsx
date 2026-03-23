@@ -23,22 +23,23 @@ export function SectionCard({
 const styles = StyleSheet.create({
   card: {
     backgroundColor: "#fffaf2",
-    borderRadius: 20,
-    padding: 18,
-    gap: 10,
+    borderRadius: 18,
+    padding: 14,
+    gap: 8,
     borderWidth: 1,
     borderColor: "#e7dcc9"
   },
   title: {
-    fontSize: 18,
+    fontSize: 17,
     fontWeight: "700",
     color: "#3e2f1f"
   },
   subtitle: {
-    fontSize: 14,
+    fontSize: 13,
+    lineHeight: 19,
     color: "#6f5a42"
   },
   content: {
-    gap: 10
+    gap: 8
   }
 });

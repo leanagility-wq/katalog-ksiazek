@@ -6,21 +6,28 @@
   "scripts": {
     "start": "expo start",
     "android": "expo run:android",
+    "android:usb": "powershell -ExecutionPolicy Bypass -File scripts/build-android-and-install.ps1",
+    "android:metro:stop": "powershell -ExecutionPolicy Bypass -File scripts/stop-metro.ps1",
     "web": "expo start --web",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "ios": "expo run:ios"
   },
   "dependencies": {
+    "@react-native-ml-kit/text-recognition": "^2.0.0",
     "expo": "~54.0.0",
     "expo-camera": "~17.0.0",
     "expo-file-system": "~18.0.0",
+    "expo-secure-store": "~15.0.7",
     "expo-sqlite": "~15.0.0",
     "react": "19.1.0",
     "react-native": "0.81.0",
+    "react-native-safe-area-context": "^5.7.0",
     "zustand": "^5.0.8"
   },
   "devDependencies": {
     "@babel/core": "^7.28.0",
     "@types/react": "~19.1.10",
+    "babel-preset-expo": "~54.0.0",
     "typescript": "~5.9.2"
   }
 }
