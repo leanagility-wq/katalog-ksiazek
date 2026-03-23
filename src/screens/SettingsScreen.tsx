@@ -1,21 +1,18 @@
-import { useEffect, useMemo, useState } from "react";
-import { ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { useEffect, useState } from "react";
+import {
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View
+} from "react-native";
 
 import { appText } from "@/config/uiText";
 import { PrimaryButton } from "@/components/PrimaryButton";
 import { SectionCard } from "@/components/SectionCard";
 import { useSettingsStore } from "@/store/useSettingsStore";
-
-function locationsToDraft(locations: string[]) {
-  return locations.join("\n");
-}
-
-function draftToLocations(value: string) {
-  return value
-    .split(/\r?\n/)
-    .map((item) => item.trim())
-    .filter(Boolean);
-}
 
 export function SettingsScreen() {
   const {
@@ -30,7 +27,7 @@ export function SettingsScreen() {
     saveSavedLocations
   } = useSettingsStore();
   const [draftApiKey, setDraftApiKey] = useState("");
-  const [draftLocations, setDraftLocations] = useState("");
+  const [draftLocation, setDraftLocation] = useState("");
   const [infoMessage, setInfoMessage] = useState<string | null>(null);
 
   useEffect(() => {
@@ -43,15 +40,6 @@ export function SettingsScreen() {
     setDraftApiKey(openAIApiKey);
   }, [openAIApiKey]);
 
-  useEffect(() => {
-    setDraftLocations(locationsToDraft(savedLocations));
-  }, [savedLocations]);
-
-  const normalizedLocationCount = useMemo(
-    () => draftToLocations(draftLocations).length,
-    [draftLocations]
-  );
-
   const handleSaveApiKey = async () => {
     await saveOpenAIApiKey(draftApiKey);
     setInfoMessage(appText.settings.savedInfo);
@@ -63,89 +51,133 @@ export function SettingsScreen() {
     setInfoMessage(appText.settings.clearedInfo);
   };
 
-  const handleSaveLocations = async () => {
-    await saveSavedLocations(draftToLocations(draftLocations));
+  const handleAddLocation = async () => {
+    const nextLocation = draftLocation.trim();
+
+    if (!nextLocation) {
+      return;
+    }
+
+    await saveSavedLocations([...savedLocations, nextLocation]);
+    setDraftLocation("");
+    setInfoMessage(appText.settings.locationsSavedInfo);
+  };
+
+  const handleRemoveLocation = async (location: string) => {
+    await saveSavedLocations(savedLocations.filter((item) => item !== location));
     setInfoMessage(appText.settings.locationsSavedInfo);
   };
 
   return (
-    <ScrollView contentContainerStyle={styles.content}>
-      <SectionCard
-        title={appText.settings.title}
-        subtitle={appText.settings.subtitle}
+    <KeyboardAvoidingView
+      style={styles.keyboardAvoidingView}
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
+    >
+      <ScrollView
+        contentContainerStyle={styles.content}
+        keyboardShouldPersistTaps="handled"
       >
-        <View style={styles.field}>
-          <Text style={styles.label}>{appText.settings.inputLabel}</Text>
-          <TextInput
-            value={draftApiKey}
-            onChangeText={setDraftApiKey}
-            style={styles.input}
-            placeholder="sk-..."
-            autoCapitalize="none"
-            autoCorrect={false}
-            secureTextEntry
-          />
-        </View>
-        <Text style={styles.helper}>{appText.settings.helper}</Text>
-        {errorMessage ? <Text style={styles.error}>{errorMessage}</Text> : null}
-        {infoMessage ? <Text style={styles.info}>{infoMessage}</Text> : null}
-        <View style={styles.actions}>
+        <SectionCard
+          title={appText.settings.title}
+          subtitle={appText.settings.subtitle}
+        >
+          <View style={styles.field}>
+            <Text style={styles.label}>{appText.settings.inputLabel}</Text>
+            <TextInput
+              value={draftApiKey}
+              onChangeText={setDraftApiKey}
+              style={styles.input}
+              placeholder="sk-..."
+              autoCapitalize="none"
+              autoCorrect={false}
+              secureTextEntry
+            />
+          </View>
+          <Text style={styles.helper}>{appText.settings.helper}</Text>
+          {errorMessage ? <Text style={styles.error}>{errorMessage}</Text> : null}
+          {infoMessage ? <Text style={styles.info}>{infoMessage}</Text> : null}
+          <View style={styles.actions}>
+            <PrimaryButton
+              label={
+                isSaving
+                  ? appText.settings.savingButton
+                  : appText.settings.saveButton
+              }
+              onPress={() => void handleSaveApiKey()}
+              disabled={isSaving || draftApiKey.trim().length === 0}
+            />
+            <PrimaryButton
+              label={
+                isSaving ? appText.settings.busyButton : appText.settings.clearButton
+              }
+              onPress={() => void handleClear()}
+              disabled={isSaving || openAIApiKey.length === 0}
+            />
+          </View>
+        </SectionCard>
+
+        <SectionCard
+          title={appText.settings.locationsTitle}
+          subtitle={appText.settings.locationsSubtitle}
+        >
+          <View style={styles.field}>
+            <Text style={styles.label}>{appText.settings.locationsLabel}</Text>
+            <TextInput
+              value={draftLocation}
+              onChangeText={setDraftLocation}
+              style={styles.input}
+              placeholder={appText.settings.locationsPlaceholder}
+              placeholderTextColor="#9a8a76"
+              returnKeyType="done"
+              onSubmitEditing={() => {
+                void handleAddLocation();
+              }}
+            />
+          </View>
+
           <PrimaryButton
             label={
               isSaving
                 ? appText.settings.savingButton
-                : appText.settings.saveButton
+                : appText.settings.saveLocationsButton
             }
-            onPress={() => void handleSaveApiKey()}
-            disabled={isSaving || draftApiKey.trim().length === 0}
+            onPress={() => void handleAddLocation()}
+            disabled={isSaving || draftLocation.trim().length === 0}
           />
-          <PrimaryButton
-            label={
-              isSaving ? appText.settings.busyButton : appText.settings.clearButton
-            }
-            onPress={() => void handleClear()}
-            disabled={isSaving || openAIApiKey.length === 0}
-          />
-        </View>
-      </SectionCard>
 
-      <SectionCard
-        title={appText.settings.locationsTitle}
-        subtitle={appText.settings.locationsSubtitle}
-      >
-        <View style={styles.field}>
-          <Text style={styles.label}>
-            {appText.settings.locationsLabel} ({normalizedLocationCount})
-          </Text>
-          <TextInput
-            value={draftLocations}
-            onChangeText={setDraftLocations}
-            style={[styles.input, styles.multilineInput]}
-            placeholder={appText.settings.locationsPlaceholder}
-            placeholderTextColor="#9a8a76"
-            multiline
-            textAlignVertical="top"
-          />
-        </View>
-        <PrimaryButton
-          label={
-            isSaving
-              ? appText.settings.savingButton
-              : appText.settings.saveLocationsButton
-          }
-          onPress={() => void handleSaveLocations()}
-          disabled={isSaving}
-        />
-      </SectionCard>
-    </ScrollView>
+          <View style={styles.savedLocations}>
+            {savedLocations.length ? (
+              savedLocations.map((location) => (
+                <View key={location} style={styles.locationRow}>
+                  <Text style={styles.locationLabel}>{location}</Text>
+                  <View style={styles.locationAction}>
+                    <PrimaryButton
+                      label={appText.settings.removeLocationButton}
+                      onPress={() => void handleRemoveLocation(location)}
+                      disabled={isSaving}
+                      compact
+                    />
+                  </View>
+                </View>
+              ))
+            ) : (
+              <Text style={styles.helper}>{appText.settings.locationsEmpty}</Text>
+            )}
+          </View>
+        </SectionCard>
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
+  keyboardAvoidingView: {
+    flex: 1
+  },
   content: {
     paddingHorizontal: 16,
     paddingTop: 10,
-    paddingBottom: 18,
+    paddingBottom: 32,
     gap: 12
   },
   field: {
@@ -164,15 +196,33 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     color: "#2d2419"
   },
-  multilineInput: {
-    minHeight: 140
-  },
   helper: {
     color: "#5d4b39",
     lineHeight: 22
   },
   actions: {
     gap: 10
+  },
+  savedLocations: {
+    gap: 8
+  },
+  locationRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    padding: 10,
+    borderRadius: 12,
+    backgroundColor: "#f8f1e8",
+    borderWidth: 1,
+    borderColor: "#eadfce"
+  },
+  locationLabel: {
+    flex: 1,
+    color: "#4b3927",
+    fontSize: 14
+  },
+  locationAction: {
+    minWidth: 84
   },
   error: {
     color: "#8f2f2f",

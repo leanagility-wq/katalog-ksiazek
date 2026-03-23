@@ -18,21 +18,10 @@ export const appText = {
     countLabel: (count: number) => `Pozycji w katalogu: ${count}`,
     scanButton: "Zeskanuj nową półkę",
     addManualButton: "Dodaj ręcznie",
-    browseTitle: "Przeglądaj i poprawiaj",
-    browseSubtitle:
-      "Otwórz książkę, aby dopisać dane, wyszukać metadane online albo usunąć wpis.",
     searchPlaceholder: "Szukaj po tytule, autorze, ISBN albo lokalizacji",
     emptyTitle: "Nie ma jeszcze pasujących książek.",
     emptyDescription:
-      "Zeskanuj półkę albo dodaj tytuł ręcznie, a potem uzupełnij szczegóły z sieci.",
-    guideTitle: "Jak to działa",
-    guideSubtitle: "Najwygodniejszy sposób pracy z katalogiem na telefonie.",
-    guideSteps: [
-      "1. Zeskanuj półkę albo dodaj książkę ręcznie.",
-      "2. Otwórz wpis i popraw tytuł, autora, lokalizację albo status.",
-      "3. Użyj przycisku \"Wyszukaj w sieci\", gdy chcesz dobrać ISBN lub lepsze metadane.",
-      "4. W razie potrzeby usuń wpis jednym przyciskiem z poziomu edycji."
-    ]
+      "Zeskanuj półkę albo dodaj tytuł ręcznie, a potem uzupełnij szczegóły z sieci."
   },
   editor: {
     createTitle: "Dodaj książkę",
@@ -133,18 +122,8 @@ export const appText = {
       "Najlepiej, jeśli w jednym zdjęciu widzisz kilka wyraźnych grzbietów i niewiele tła po bokach. Cienkich książek może być więcej niż 5.",
     captureButton: "Zrób zdjęcie i skanuj",
     processingButton: "Przetwarzanie...",
-    tipsTitle: "Jak skanować",
-    tipsSubtitle:
-      "Tu naprawdę liczy się sposób robienia zdjęcia, nie tylko sam model OCR.",
-    tips: [
-      "1. Skanuj małe fragmenty półki, nie cały regał.",
-      "2. Utrzymuj telefon równolegle do grzbietów książek.",
-      "3. Unikaj odbić światła i cienia na lakierowanych okładkach.",
-      "4. Jeśli jeden grzbiet jest węższy lub pionowy, zeskanuj go osobno."
-    ],
-    apiKeyPresent: "Klucz API jest zapisany. Użyjemy mocniejszego OCR online.",
-    apiKeyMissing:
-      "Brak klucza API. Ustaw go w zakładce Ustawienia, żeby włączyć OCR online."
+    apiKeyPresent: "OCR online",
+    apiKeyMissing: "Fallback lokalny"
   },
   settings: {
     title: "OCR online",
@@ -157,11 +136,13 @@ export const appText = {
     clearedInfo: "Klucz API został usunięty z urządzenia.",
     locationsTitle: "Zapisane lokalizacje",
     locationsSubtitle:
-      "Wpisz lokalizacje po jednej w każdej linii. Później będą dostępne w szybkiej edycji książek.",
-    locationsLabel: "Lista lokalizacji",
-    locationsPlaceholder: "Salon / Półka A\nGabinet / Regał 2\nSypialnia / Szafka",
+      "Dodaj lokalizacje pojedynczo. Później będą dostępne w szybkiej edycji książek.",
+    locationsLabel: "Nowa lokalizacja",
+    locationsPlaceholder: "Np. Salon / Półka A",
     locationsSavedInfo: "Lista lokalizacji została zapisana.",
-    saveLocationsButton: "Zapisz lokalizacje",
+    saveLocationsButton: "Dodaj lokalizację",
+    locationsEmpty: "Nie masz jeszcze zapisanych lokalizacji.",
+    removeLocationButton: "Usuń",
     saveButton: "Zapisz klucz API",
     savingButton: "Zapisywanie...",
     clearButton: "Usuń klucz z telefonu",

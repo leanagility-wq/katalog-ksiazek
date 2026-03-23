@@ -18,6 +18,7 @@ import {
   searchBooksOnline
 } from "@/features/catalog/bookLookupService";
 import { useLibraryStore } from "@/store/useLibraryStore";
+import { useSettingsStore } from "@/store/useSettingsStore";
 import { Book, BookStatus } from "@/types/book";
 
 type BookDraft = {
@@ -114,6 +115,7 @@ export function BookEditorScreen({
   const [isDeleting, setIsDeleting] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
   const { saveBook, deleteBook } = useLibraryStore();
+  const { savedLocations } = useSettingsStore();
 
   useEffect(() => {
     setDraft(createDraft(book));
@@ -307,6 +309,19 @@ export function BookEditorScreen({
             onChangeText={(value) => updateDraft("shelfLocation", value)}
             placeholder={appText.editor.fields.locationPlaceholder}
           />
+          {savedLocations.length ? (
+            <View style={styles.locationSuggestions}>
+              {savedLocations.map((location) => (
+                <Pressable
+                  key={location}
+                  onPress={() => updateDraft("shelfLocation", location)}
+                  style={styles.locationChip}
+                >
+                  <Text style={styles.locationChipLabel}>{location}</Text>
+                </Pressable>
+              ))}
+            </View>
+          ) : null}
           <Field
             label={appText.editor.fields.price}
             value={draft.price}
@@ -474,6 +489,25 @@ const styles = StyleSheet.create({
   resultMeta: {
     color: "#6e5a43",
     fontSize: 13
+  },
+  locationSuggestions: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+    marginTop: -6
+  },
+  locationChip: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 999,
+    backgroundColor: "#f2ebdf",
+    borderWidth: 1,
+    borderColor: "#e5d8c3"
+  },
+  locationChipLabel: {
+    color: "#6e5a43",
+    fontSize: 12,
+    fontWeight: "700"
   },
   statusBlock: {
     gap: 8
