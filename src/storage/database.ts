@@ -6,6 +6,18 @@ const DATABASE_NAME = "library.db";
 
 let databasePromise: Promise<SQLiteDatabase> | null = null;
 
+function toSqlValue(value: string | number | null | undefined) {
+  if (value == null) {
+    return "NULL";
+  }
+
+  if (typeof value === "number") {
+    return Number.isFinite(value) ? String(value) : "NULL";
+  }
+
+  return `'${value.replace(/'/g, "''")}'`;
+}
+
 async function createSchema(db: SQLiteDatabase) {
   await db.execAsync(`
     CREATE TABLE IF NOT EXISTS books (
@@ -26,20 +38,6 @@ async function createSchema(db: SQLiteDatabase) {
   `);
 }
 
-async function executeWrite(
-  db: SQLiteDatabase,
-  source: string,
-  ...params: Array<string | number | null>
-) {
-  const statement = await db.prepareAsync(source);
-
-  try {
-    await statement.executeAsync(...params);
-  } finally {
-    await statement.finalizeAsync();
-  }
-}
-
 async function seedDatabase(db: SQLiteDatabase) {
   const result = await db.getFirstAsync<{ count: number }>(
     "SELECT COUNT(*) as count FROM books"
@@ -50,29 +48,27 @@ async function seedDatabase(db: SQLiteDatabase) {
   }
 
   for (const book of mockBooks) {
-    await executeWrite(
-      db,
-      `
-        INSERT INTO books (
-          id, title, author, isbn, shelfLocation, imageUri, ocrText,
-          price, borrowedTo, notes, status, createdAt, updatedAt
-        )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `,
-      book.id,
-      book.title,
-      book.author,
-      book.isbn ?? null,
-      book.shelfLocation ?? null,
-      book.imageUri ?? null,
-      book.ocrText,
-      book.price ?? null,
-      book.borrowedTo ?? null,
-      book.notes ?? null,
-      book.status,
-      book.createdAt,
-      book.updatedAt
-    );
+    await db.execAsync(`
+      INSERT INTO books (
+        id, title, author, isbn, shelfLocation, imageUri, ocrText,
+        price, borrowedTo, notes, status, createdAt, updatedAt
+      )
+      VALUES (
+        ${toSqlValue(book.id)},
+        ${toSqlValue(book.title)},
+        ${toSqlValue(book.author)},
+        ${toSqlValue(book.isbn)},
+        ${toSqlValue(book.shelfLocation)},
+        ${toSqlValue(book.imageUri)},
+        ${toSqlValue(book.ocrText)},
+        ${toSqlValue(book.price ?? null)},
+        ${toSqlValue(book.borrowedTo)},
+        ${toSqlValue(book.notes)},
+        ${toSqlValue(book.status)},
+        ${toSqlValue(book.createdAt)},
+        ${toSqlValue(book.updatedAt)}
+      );
+    `);
   }
 }
 

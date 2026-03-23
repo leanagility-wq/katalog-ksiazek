@@ -8,15 +8,16 @@ export interface BookRepository {
   remove(id: string): Promise<void>;
 }
 
-async function executeWrite(source: string, ...params: Array<string | number | null>) {
-  const db = await getDatabase();
-  const statement = await db.prepareAsync(source);
-
-  try {
-    await statement.executeAsync(...params);
-  } finally {
-    await statement.finalizeAsync();
+function toSqlValue(value: string | number | null | undefined) {
+  if (value == null) {
+    return "NULL";
   }
+
+  if (typeof value === "number") {
+    return Number.isFinite(value) ? String(value) : "NULL";
+  }
+
+  return `'${value.replace(/'/g, "''")}'`;
 }
 
 class SQLiteBookRepository implements BookRepository {
@@ -46,6 +47,7 @@ class SQLiteBookRepository implements BookRepository {
   }
 
   async save(book: Book) {
+    const db = await getDatabase();
     const normalizedBook: Book = {
       ...book,
       title: normalizeStoredText(book.title) ?? "",
@@ -58,45 +60,45 @@ class SQLiteBookRepository implements BookRepository {
       notes: normalizeStoredText(book.notes)
     };
 
-    await executeWrite(
-      `
-        INSERT INTO books (
-          id, title, author, isbn, shelfLocation, imageUri, ocrText,
-          price, borrowedTo, notes, status, createdAt, updatedAt
-        )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ON CONFLICT(id) DO UPDATE SET
-          title = excluded.title,
-          author = excluded.author,
-          isbn = excluded.isbn,
-          shelfLocation = excluded.shelfLocation,
-          imageUri = excluded.imageUri,
-          ocrText = excluded.ocrText,
-          price = excluded.price,
-          borrowedTo = excluded.borrowedTo,
-          notes = excluded.notes,
-          status = excluded.status,
-          createdAt = excluded.createdAt,
-          updatedAt = excluded.updatedAt
-      `,
-      normalizedBook.id,
-      normalizedBook.title,
-      normalizedBook.author,
-      normalizedBook.isbn ?? null,
-      normalizedBook.shelfLocation ?? null,
-      normalizedBook.imageUri ?? null,
-      normalizedBook.ocrText,
-      normalizedBook.price ?? null,
-      normalizedBook.borrowedTo ?? null,
-      normalizedBook.notes ?? null,
-      normalizedBook.status,
-      normalizedBook.createdAt,
-      normalizedBook.updatedAt
-    );
+    await db.execAsync(`
+      INSERT INTO books (
+        id, title, author, isbn, shelfLocation, imageUri, ocrText,
+        price, borrowedTo, notes, status, createdAt, updatedAt
+      )
+      VALUES (
+        ${toSqlValue(normalizedBook.id)},
+        ${toSqlValue(normalizedBook.title)},
+        ${toSqlValue(normalizedBook.author)},
+        ${toSqlValue(normalizedBook.isbn)},
+        ${toSqlValue(normalizedBook.shelfLocation)},
+        ${toSqlValue(normalizedBook.imageUri)},
+        ${toSqlValue(normalizedBook.ocrText)},
+        ${toSqlValue(normalizedBook.price ?? null)},
+        ${toSqlValue(normalizedBook.borrowedTo)},
+        ${toSqlValue(normalizedBook.notes)},
+        ${toSqlValue(normalizedBook.status)},
+        ${toSqlValue(normalizedBook.createdAt)},
+        ${toSqlValue(normalizedBook.updatedAt)}
+      )
+      ON CONFLICT(id) DO UPDATE SET
+        title = excluded.title,
+        author = excluded.author,
+        isbn = excluded.isbn,
+        shelfLocation = excluded.shelfLocation,
+        imageUri = excluded.imageUri,
+        ocrText = excluded.ocrText,
+        price = excluded.price,
+        borrowedTo = excluded.borrowedTo,
+        notes = excluded.notes,
+        status = excluded.status,
+        createdAt = excluded.createdAt,
+        updatedAt = excluded.updatedAt;
+    `);
   }
 
   async remove(id: string) {
-    await executeWrite("DELETE FROM books WHERE id = ?", id);
+    const db = await getDatabase();
+    await db.execAsync(`DELETE FROM books WHERE id = ${toSqlValue(id)};`);
   }
 }
 
