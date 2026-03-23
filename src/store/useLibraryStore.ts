@@ -9,6 +9,7 @@ interface LibraryState {
   errorMessage: string | null;
   loadBooks: () => Promise<void>;
   saveBook: (book: Book) => Promise<void>;
+  deleteBook: (id: string) => Promise<void>;
 }
 
 export const useLibraryStore = create<LibraryState>((set) => ({
@@ -24,8 +25,10 @@ export const useLibraryStore = create<LibraryState>((set) => ({
     } catch (error) {
       set({
         isLoading: false,
-          errorMessage:
-          error instanceof Error ? error.message : "Nie udało się załadować katalogu."
+        errorMessage:
+          error instanceof Error
+            ? error.message
+            : "Nie udalo sie zaladowac katalogu."
       });
     }
   },
@@ -37,7 +40,19 @@ export const useLibraryStore = create<LibraryState>((set) => ({
     } catch (error) {
       set({
         errorMessage:
-          error instanceof Error ? error.message : "Nie udało się zapisać książki."
+          error instanceof Error ? error.message : "Nie udalo sie zapisac ksiazki."
+      });
+    }
+  },
+  deleteBook: async (id) => {
+    try {
+      await bookRepository.remove(id);
+      const books = await bookRepository.list();
+      set({ books, errorMessage: null });
+    } catch (error) {
+      set({
+        errorMessage:
+          error instanceof Error ? error.message : "Nie udalo sie usunac ksiazki."
       });
     }
   }

@@ -5,6 +5,7 @@ import { normalizeStoredText } from "@/utils/text";
 export interface BookRepository {
   list(): Promise<Book[]>;
   save(book: Book): Promise<void>;
+  remove(id: string): Promise<void>;
 }
 
 class SQLiteBookRepository implements BookRepository {
@@ -82,6 +83,11 @@ class SQLiteBookRepository implements BookRepository {
       normalizedBook.createdAt,
       normalizedBook.updatedAt
     );
+  }
+
+  async remove(id: string) {
+    const db = await getDatabase();
+    await db.runAsync("DELETE FROM books WHERE id = ?", id);
   }
 }
 

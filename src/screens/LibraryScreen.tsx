@@ -1,16 +1,88 @@
-import { ScrollView, StyleSheet, Text, View } from "react-native";
+import { useMemo, useState } from "react";
+import {
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View
+} from "react-native";
 
 import { BookListItem } from "@/components/BookListItem";
 import { PrimaryButton } from "@/components/PrimaryButton";
 import { SectionCard } from "@/components/SectionCard";
+import { BookEditorScreen } from "@/screens/BookEditorScreen";
 import { useLibraryStore } from "@/store/useLibraryStore";
+
+type SortKey = "updated_desc" | "title_asc" | "author_asc" | "status_asc";
 
 interface LibraryScreenProps {
   onStartScan: () => void;
 }
 
+const SORT_OPTIONS: Array<{ key: SortKey; label: string }> = [
+  { key: "updated_desc", label: "Ostatnio zmienione" },
+  { key: "title_asc", label: "Tytul A-Z" },
+  { key: "author_asc", label: "Autor A-Z" },
+  { key: "status_asc", label: "Status" }
+];
+
 export function LibraryScreen({ onStartScan }: LibraryScreenProps) {
   const { books, isLoading, errorMessage } = useLibraryStore();
+  const [sortKey, setSortKey] = useState<SortKey>("updated_desc");
+  const [query, setQuery] = useState("");
+  const [selectedBookId, setSelectedBookId] = useState<string | null>(null);
+  const [isCreating, setIsCreating] = useState(false);
+
+  const selectedBook = useMemo(
+    () => books.find((book) => book.id === selectedBookId) ?? null,
+    [books, selectedBookId]
+  );
+
+  const visibleBooks = useMemo(() => {
+    const normalizedQuery = query.trim().toLowerCase();
+
+    const filteredBooks = normalizedQuery
+      ? books.filter((book) =>
+          [book.title, book.author, book.isbn, book.shelfLocation, book.notes]
+            .filter(Boolean)
+            .some((value) => value?.toLowerCase().includes(normalizedQuery))
+        )
+      : books;
+
+    const sortedBooks = [...filteredBooks];
+
+    sortedBooks.sort((left, right) => {
+      switch (sortKey) {
+        case "title_asc":
+          return left.title.localeCompare(right.title, "pl");
+        case "author_asc":
+          return left.author.localeCompare(right.author, "pl");
+        case "status_asc":
+          return left.status.localeCompare(right.status, "pl") || left.title.localeCompare(right.title, "pl");
+        case "updated_desc":
+        default:
+          return right.updatedAt.localeCompare(left.updatedAt);
+      }
+    });
+
+    return sortedBooks;
+  }, [books, query, sortKey]);
+
+  const closeEditor = () => {
+    setSelectedBookId(null);
+    setIsCreating(false);
+  };
+
+  if (selectedBook || isCreating) {
+    return (
+      <BookEditorScreen
+        book={selectedBook}
+        onBack={closeEditor}
+        onSaved={closeEditor}
+      />
+    );
+  }
 
   return (
     <ScrollView contentContainerStyle={styles.content}>
@@ -18,37 +90,94 @@ export function LibraryScreen({ onStartScan }: LibraryScreenProps) {
         title={"Katalog"}
         subtitle={
           isLoading
-            ? "\u0141adowanie biblioteki..."
-            : `Liczba pozycji: ${books.length}`
+            ? "Ladowanie biblioteki..."
+            : `Pozycji w katalogu: ${books.length}`
         }
       >
-        <PrimaryButton label={"Zeskanuj now\u0105 p\u00f3\u0142k\u0119"} onPress={onStartScan} />
+        <View style={styles.heroActions}>
+          <View style={styles.heroAction}>
+            <PrimaryButton label={"Zeskanuj nowa polke"} onPress={onStartScan} />
+          </View>
+          <View style={styles.heroAction}>
+            <PrimaryButton
+              label={"Dodaj recznie"}
+              onPress={() => {
+                setIsCreating(true);
+              }}
+            />
+          </View>
+        </View>
         {errorMessage ? <Text style={styles.error}>{errorMessage}</Text> : null}
+      </SectionCard>
+
+      <SectionCard
+        title={"Przegladaj i poprawiaj"}
+        subtitle={"Otworz ksiazke, aby dopisac dane, wyszukac metadane online albo usunac wpis."}
+      >
+        <TextInput
+          value={query}
+          onChangeText={setQuery}
+          placeholder="Szukaj po tytule, autorze, ISBN albo lokalizacji"
+          placeholderTextColor="#9a8a76"
+          style={styles.searchInput}
+        />
+        <View style={styles.sortRow}>
+          {SORT_OPTIONS.map((option) => {
+            const isActive = option.key === sortKey;
+
+            return (
+              <Pressable
+                key={option.key}
+                onPress={() => setSortKey(option.key)}
+                style={[styles.sortChip, isActive ? styles.sortChipActive : null]}
+              >
+                <Text
+                  style={[
+                    styles.sortChipLabel,
+                    isActive ? styles.sortChipLabelActive : null
+                  ]}
+                >
+                  {option.label}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
         <View style={styles.list}>
-          {books.map((book) => (
-            <BookListItem key={book.id} book={book} />
-          ))}
+          {visibleBooks.length ? (
+            visibleBooks.map((book) => (
+              <BookListItem
+                key={book.id}
+                book={book}
+                onPress={() => setSelectedBookId(book.id)}
+              />
+            ))
+          ) : (
+            <View style={styles.emptyState}>
+              <Text style={styles.emptyTitle}>Nie ma jeszcze pasujacych ksiazek.</Text>
+              <Text style={styles.emptyText}>
+                Zeskanuj polke albo dodaj tytul recznie, a potem uzupelnij szczegoly z sieci.
+              </Text>
+            </View>
+          )}
         </View>
       </SectionCard>
 
       <SectionCard
-        title={"Jak u\u017cywa\u0107"}
-        subtitle={"Kr\u00f3tka instrukcja obs\u0142ugi aplikacji."}
+        title={"Jak to dziala"}
+        subtitle={"Najwygodniejszy sposob pracy z katalogiem na telefonie."}
       >
         <Text style={styles.listItem}>
-          {"1. Otw\u00f3rz \"Ustawienia\" i zapisz sw\u00f3j klucz OpenAI API."}
+          {"1. Zeskanuj polke albo dodaj ksiazke recznie."}
         </Text>
         <Text style={styles.listItem}>
-          {"2. Przejd\u017a do \"Skan\" i zr\u00f3b zdj\u0119cie p\u00f3\u0142ki z ksi\u0105\u017ckami."}
+          {"2. Otworz wpis i popraw tytul, autora, lokalizacje albo status."}
         </Text>
         <Text style={styles.listItem}>
-          {"3. W \"Przegl\u0105dzie\" popraw tytu\u0142y i autor\u00f3w, je\u015bli trzeba."}
+          {"3. Uzyj przycisku \"Wyszukaj w sieci\", gdy chcesz dobrac ISBN lub lepsze metadane."}
         </Text>
         <Text style={styles.listItem}>
-          {"4. Zapisz wynik, a ksi\u0105\u017cki pojawi\u0105 si\u0119 w katalogu."}
-        </Text>
-        <Text style={styles.listItem}>
-          {"5. W zak\u0142adce \"Eksport\" skopiujesz dane do dalszej obr\u00f3bki."}
+          {"4. W razie potrzeby usun wpis jednym przyciskiem z poziomu edycji."}
         </Text>
       </SectionCard>
     </ScrollView>
@@ -62,8 +191,64 @@ const styles = StyleSheet.create({
     paddingBottom: 18,
     gap: 12
   },
+  heroActions: {
+    flexDirection: "row",
+    gap: 10
+  },
+  heroAction: {
+    flex: 1
+  },
+  searchInput: {
+    minHeight: 46,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: "#e1d4bf",
+    backgroundColor: "#fffdf8",
+    color: "#2d2419",
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    fontSize: 15
+  },
+  sortRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8
+  },
+  sortChip: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 999,
+    backgroundColor: "#eee2cf"
+  },
+  sortChipActive: {
+    backgroundColor: "#704d2e"
+  },
+  sortChipLabel: {
+    color: "#6d5636",
+    fontSize: 13,
+    fontWeight: "700"
+  },
+  sortChipLabelActive: {
+    color: "#fff8ee"
+  },
   list: {
-    gap: 4
+    gap: 8
+  },
+  emptyState: {
+    borderRadius: 14,
+    backgroundColor: "#f8f1e8",
+    padding: 14,
+    gap: 6
+  },
+  emptyTitle: {
+    color: "#3d2d1d",
+    fontSize: 15,
+    fontWeight: "700"
+  },
+  emptyText: {
+    color: "#6f5a42",
+    fontSize: 14,
+    lineHeight: 20
   },
   listItem: {
     color: "#4c3926",
