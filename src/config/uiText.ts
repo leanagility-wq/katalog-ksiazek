@@ -165,13 +165,16 @@ export const appText = {
   export: {
     title: "Eksport danych",
     subtitle:
-      "Na tym etapie przygotowany jest poprawny format eksportu. Kolejny krok to zapis do pliku na urządzeniu.",
-    csvLabel: "CSV",
-    jsonLabel: "JSON",
+      "Możesz wyeksportować katalog do pliku CSV, poprawić dane poza aplikacją i zaimportować go z powrotem do bazy.",
     shareCsvButton: "Utwórz i udostępnij CSV",
     sharingCsvButton: "Tworzę plik CSV...",
+    importCsvButton: "Importuj CSV",
+    importingCsvButton: "Importuję CSV...",
     successMessage: (path: string) => `Plik CSV gotowy: ${path}`,
-    errorTitle: "Nie udało się wyeksportować CSV"
+    importSuccessMessage: (count: number) =>
+      `Zaimportowano lub zaktualizowano ${count} książek z pliku CSV.`,
+    errorTitle: "Nie udało się wyeksportować CSV",
+    importErrorTitle: "Nie udało się zaimportować CSV"
   },
   scan: {
     title: "Skanowanie",

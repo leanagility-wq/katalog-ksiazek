@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   Alert,
+  BackHandler,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -138,6 +139,17 @@ export function BookEditorScreen({
     setSearchError(null);
     setPendingDuplicate(null);
   }, [book]);
+
+  useEffect(() => {
+    const subscription = BackHandler.addEventListener("hardwareBackPress", () => {
+      onBack();
+      return true;
+    });
+
+    return () => {
+      subscription.remove();
+    };
+  }, [onBack]);
 
   const screenTitle = useMemo(
     () => (book ? appText.editor.editTitle : appText.editor.createTitle),

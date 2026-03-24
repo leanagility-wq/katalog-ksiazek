@@ -1,28 +1,22 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { Alert, ScrollView, StyleSheet, Text } from "react-native";
+import * as DocumentPicker from "expo-document-picker";
+import * as FileSystem from "expo-file-system";
 
 import { appText } from "@/config/uiText";
 import { PrimaryButton } from "@/components/PrimaryButton";
 import { SectionCard } from "@/components/SectionCard";
 import {
+  importBooksFromCsv,
   shareCsvExport,
-  exportBooksToCsv,
-  exportBooksToJson
 } from "@/features/export/exportService";
 import { useLibraryStore } from "@/store/useLibraryStore";
 
 export function ExportScreen() {
-  const { books } = useLibraryStore();
+  const { books, saveBooksBulk } = useLibraryStore();
   const [isSharingCsv, setIsSharingCsv] = useState(false);
+  const [isImportingCsv, setIsImportingCsv] = useState(false);
   const [lastExportMessage, setLastExportMessage] = useState<string | null>(null);
-
-  const preview = useMemo(
-    () => ({
-      csv: exportBooksToCsv(books),
-      json: exportBooksToJson(books)
-    }),
-    [books]
-  );
 
   const handleShareCsv = async () => {
     setIsSharingCsv(true);
@@ -38,6 +32,42 @@ export function ExportScreen() {
       );
     } finally {
       setIsSharingCsv(false);
+    }
+  };
+
+  const handleImportCsv = async () => {
+    setIsImportingCsv(true);
+    setLastExportMessage(null);
+
+    try {
+      const result = await DocumentPicker.getDocumentAsync({
+        type: ["text/csv", "text/comma-separated-values", "*/*"],
+        copyToCacheDirectory: true,
+        multiple: false
+      });
+
+      if (result.canceled || !result.assets?.length) {
+        return;
+      }
+
+      const fileUri = result.assets[0].uri;
+      const csvText = await FileSystem.readAsStringAsync(fileUri, {
+        encoding: FileSystem.EncodingType.UTF8
+      });
+      const importedBooks = importBooksFromCsv(csvText);
+
+      await saveBooksBulk(importedBooks);
+
+      setLastExportMessage(
+        appText.export.importSuccessMessage(importedBooks.length)
+      );
+    } catch (error) {
+      Alert.alert(
+        appText.export.importErrorTitle,
+        error instanceof Error ? error.message : appText.editor.retryLabel
+      );
+    } finally {
+      setIsImportingCsv(false);
     }
   };
 
@@ -58,13 +88,20 @@ export function ExportScreen() {
           }}
           disabled={isSharingCsv}
         />
+        <PrimaryButton
+          label={
+            isImportingCsv
+              ? appText.export.importingCsvButton
+              : appText.export.importCsvButton
+          }
+          onPress={() => {
+            void handleImportCsv();
+          }}
+          disabled={isImportingCsv || isSharingCsv}
+        />
         {lastExportMessage ? (
           <Text style={styles.successMessage}>{lastExportMessage}</Text>
         ) : null}
-        <Text style={styles.label}>{appText.export.csvLabel}</Text>
-        <Text style={styles.codeBlock}>{preview.csv}</Text>
-        <Text style={styles.label}>{appText.export.jsonLabel}</Text>
-        <Text style={styles.codeBlock}>{preview.json}</Text>
       </SectionCard>
     </ScrollView>
   );
@@ -76,23 +113,9 @@ const styles = StyleSheet.create({
     paddingTop: 10,
     paddingBottom: 18
   },
-  label: {
-    fontSize: 12,
-    textTransform: "uppercase",
-    color: "#7d6240",
-    fontWeight: "700"
-  },
   successMessage: {
     color: "#5f6f2c",
     fontSize: 12,
     lineHeight: 18
-  },
-  codeBlock: {
-    backgroundColor: "#f4ead8",
-    borderRadius: 12,
-    padding: 12,
-    color: "#4f3c28",
-    fontFamily: "monospace",
-    maxHeight: 180
   }
 });
