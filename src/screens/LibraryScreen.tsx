@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
+  Alert,
   FlatList,
   ListRenderItemInfo,
   Pressable,
@@ -26,7 +27,7 @@ import { useLibraryStore } from "@/store/useLibraryStore";
 import { useSettingsStore } from "@/store/useSettingsStore";
 import { Book } from "@/types/book";
 
-type QuickEditMode = "status" | "location" | null;
+type QuickEditMode = "status" | "location" | "genre" | null;
 const CATALOG_PAGE_SIZE = 40;
 const ALL_GENRES_FILTER = "__all__";
 const ALL_LOCATIONS_FILTER = "__all_locations__";
@@ -49,7 +50,8 @@ export function LibraryScreen({ onStartScan }: LibraryScreenProps) {
     errorMessage,
     saveBook,
     saveBooksBulk,
-    applyBatchUpdate
+    applyBatchUpdate,
+    deleteBook
   } = useLibraryStore();
   const { savedLocations, savedGenres } = useSettingsStore();
   const [sortKey, setSortKey] = useState<SortKey>("updated_desc");
@@ -108,6 +110,10 @@ export function LibraryScreen({ onStartScan }: LibraryScreenProps) {
         ).sort((left, right) => left.localeCompare(right, "pl"))
       ],
     [books, savedGenres]
+  );
+  const quickGenreOptions = useMemo(
+    () => genreOptions.filter((option) => option !== ALL_GENRES_FILTER),
+    [genreOptions]
   );
 
   const locationFilterOptions = useMemo(
@@ -335,7 +341,7 @@ export function LibraryScreen({ onStartScan }: LibraryScreenProps) {
 
   const updateBookQuickly = async (
     book: Book,
-    changes: Partial<Pick<Book, "status" | "shelfLocation">>
+    changes: Partial<Pick<Book, "status" | "shelfLocation" | "genre">>
   ) => {
     setUpdatingBookId(book.id);
 
@@ -361,6 +367,37 @@ export function LibraryScreen({ onStartScan }: LibraryScreenProps) {
     await updateBookQuickly(book, {
       shelfLocation: location?.trim() || undefined
     });
+  };
+
+  const handleQuickGenreSave = async (book: Book, genre?: string) => {
+    await updateBookQuickly(book, {
+      genre: normalizeGenreLabel(genre)
+    });
+  };
+
+  const handleDeleteBook = (book: Book) => {
+    Alert.alert("Usunąć książkę?", `Czy na pewno chcesz usunąć „${book.title}”?`, [
+      {
+        text: "Anuluj",
+        style: "cancel"
+      },
+      {
+        text: "Usuń",
+        style: "destructive",
+        onPress: () => {
+          void (async () => {
+            setUpdatingBookId(book.id);
+
+            try {
+              await deleteBook(book.id);
+            } finally {
+              setUpdatingBookId(null);
+              closeQuickEdit();
+            }
+          })();
+        }
+      }
+    ]);
   };
 
   const applyBatchChanges = async (
@@ -557,6 +594,9 @@ export function LibraryScreen({ onStartScan }: LibraryScreenProps) {
       locationOptions={locationOptions.filter(
         (location) => location !== item.shelfLocation
       )}
+      genreOptions={quickGenreOptions.filter(
+        (genre) => genre !== normalizeGenreLabel(item.genre)
+      )}
       onToggleQuickEdit={(mode) => handleQuickEditToggle(item.id, mode)}
       onQuickStatusSelect={(status) => {
         void handleQuickStatusSelect(item, status);
@@ -564,6 +604,10 @@ export function LibraryScreen({ onStartScan }: LibraryScreenProps) {
       onQuickLocationSave={(location) => {
         void handleQuickLocationSave(item, location);
       }}
+      onQuickGenreSave={(genre) => {
+        void handleQuickGenreSave(item, genre);
+      }}
+      onDeletePress={() => handleDeleteBook(item)}
     />
   );
 

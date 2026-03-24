@@ -10,7 +10,7 @@ import { PrimaryButton } from "@/components/PrimaryButton";
 import { normalizeGenreLabel } from "@/features/catalog/genreCatalog";
 import { Book, BookStatus } from "@/types/book";
 
-type QuickEditMode = "status" | "location" | null;
+type QuickEditMode = "status" | "location" | "genre" | null;
 
 interface BookListItemProps {
   book: Book;
@@ -23,9 +23,12 @@ interface BookListItemProps {
   quickEditMode?: QuickEditMode;
   isUpdating?: boolean;
   locationOptions: string[];
+  genreOptions: string[];
   onToggleQuickEdit: (mode: Exclude<QuickEditMode, null>) => void;
   onQuickStatusSelect: (status: BookStatus) => void;
   onQuickLocationSave: (location?: string) => void;
+  onQuickGenreSave: (genre?: string) => void;
+  onDeletePress?: () => void;
 }
 
 export function BookListItem({
@@ -39,22 +42,27 @@ export function BookListItem({
   quickEditMode = null,
   isUpdating = false,
   locationOptions,
+  genreOptions,
   onToggleQuickEdit,
   onQuickStatusSelect,
-  onQuickLocationSave
+  onQuickLocationSave,
+  onQuickGenreSave,
+  onDeletePress
 }: BookListItemProps) {
   const statusStyle = STATUS_STYLES[book.status];
   const bookGenre = normalizeGenreLabel(book.genre);
   const [locationDraft, setLocationDraft] = useState(book.shelfLocation ?? "");
+  const [genreDraft, setGenreDraft] = useState(bookGenre ?? "");
 
   useEffect(() => {
     setLocationDraft(book.shelfLocation ?? "");
-  }, [book.shelfLocation, quickEditMode]);
+    setGenreDraft(bookGenre ?? "");
+  }, [book.shelfLocation, bookGenre, quickEditMode]);
 
   return (
     <View style={styles.wrapper}>
       <Pressable
-        onPress={isSelectable ? onToggleSelection : onPress}
+        onPress={isSelectable ? onToggleSelection : undefined}
         style={({ pressed }) => [styles.row, pressed ? styles.rowPressed : null]}
       >
         <View style={styles.mainRow}>
@@ -65,11 +73,12 @@ export function BookListItem({
               </View>
             </Pressable>
           ) : null}
+
           <View style={styles.copy}>
             <Pressable
+              onPress={isSelectable ? onToggleSelection : onPress}
               onLongPress={onTitleLongPress}
               delayLongPress={260}
-              disabled={isSelectable}
             >
               <Text numberOfLines={1} style={styles.title}>
                 {book.title || "Bez tytułu"}
@@ -78,11 +87,13 @@ export function BookListItem({
             <Text numberOfLines={1} style={styles.meta}>
               {book.author || "Autor do uzupełnienia"}
             </Text>
+
             {isDuplicate ? (
               <View style={styles.duplicatePill}>
                 <Text style={styles.duplicatePillText}>Możliwy duplikat</Text>
               </View>
             ) : null}
+
             <View style={styles.metaRow}>
               <Pressable
                 onPress={() => onToggleQuickEdit("location")}
@@ -93,13 +104,21 @@ export function BookListItem({
                   {book.shelfLocation || "Dodaj lokalizację"}
                 </Text>
               </Pressable>
+
               {bookGenre ? (
-                <Text numberOfLines={1} style={styles.metaPill}>
-                  <Text style={styles.metaPillText}>{bookGenre}</Text>
-                </Text>
+                <Pressable
+                  onPress={() => onToggleQuickEdit("genre")}
+                  disabled={isSelectable}
+                  style={styles.metaPill}
+                >
+                  <Text numberOfLines={1} style={styles.metaPillText}>
+                    {bookGenre}
+                  </Text>
+                </Pressable>
               ) : null}
             </View>
           </View>
+
           <View style={styles.sideColumn}>
             <Pressable
               onPress={() => onToggleQuickEdit("status")}
@@ -113,7 +132,17 @@ export function BookListItem({
                 {STATUS_LABELS[book.status]}
               </Text>
             </Pressable>
-            {!isSelectable ? <Text style={styles.arrow}>{">"}</Text> : null}
+
+            {!isSelectable ? (
+              <View style={styles.sideActions}>
+                <Pressable onPress={onDeletePress} style={styles.deleteAction}>
+                  <Text style={styles.deleteActionLabel}>Usuń</Text>
+                </Pressable>
+                <Pressable onPress={onPress} style={styles.arrowPressable}>
+                  <Text style={styles.arrow}>{">"}</Text>
+                </Pressable>
+              </View>
+            ) : null}
           </View>
         </View>
       </Pressable>
@@ -200,6 +229,51 @@ export function BookListItem({
           </View>
         </View>
       ) : null}
+
+      {quickEditMode === "genre" && !isSelectable ? (
+        <View style={styles.quickPanel}>
+          <Text style={styles.quickTitle}>Zmień gatunek</Text>
+          {genreOptions.length ? (
+            <View style={styles.quickOptions}>
+              {genreOptions.map((option) => (
+                <Pressable
+                  key={option}
+                  onPress={() => onQuickGenreSave(option)}
+                  disabled={isUpdating}
+                  style={styles.quickChip}
+                >
+                  <Text style={styles.quickChipText}>{option}</Text>
+                </Pressable>
+              ))}
+            </View>
+          ) : null}
+          <TextInput
+            value={genreDraft}
+            onChangeText={setGenreDraft}
+            placeholder="Wpisz gatunek"
+            placeholderTextColor="#9a8a76"
+            style={styles.locationInput}
+          />
+          <View style={styles.quickActions}>
+            <View style={styles.quickAction}>
+              <PrimaryButton
+                label={isUpdating ? "Zapisywanie..." : "Zapisz"}
+                onPress={() => onQuickGenreSave(genreDraft.trim() || undefined)}
+                disabled={isUpdating}
+                compact
+              />
+            </View>
+            <View style={styles.quickAction}>
+              <PrimaryButton
+                label="Wyczyść"
+                onPress={() => onQuickGenreSave(undefined)}
+                disabled={isUpdating}
+                compact
+              />
+            </View>
+          </View>
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -248,7 +322,11 @@ const styles = StyleSheet.create({
   },
   sideColumn: {
     alignItems: "flex-end",
-    gap: 10
+    gap: 8
+  },
+  sideActions: {
+    alignItems: "flex-end",
+    gap: 6
   },
   badge: {
     paddingHorizontal: 8,
@@ -259,6 +337,21 @@ const styles = StyleSheet.create({
     fontSize: 10,
     textTransform: "uppercase",
     fontWeight: "800"
+  },
+  deleteAction: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 999,
+    backgroundColor: "#f8dfdc"
+  },
+  deleteActionLabel: {
+    color: "#8b3028",
+    fontSize: 11,
+    fontWeight: "700"
+  },
+  arrowPressable: {
+    paddingHorizontal: 4,
+    paddingVertical: 2
   },
   arrow: {
     fontSize: 20,
