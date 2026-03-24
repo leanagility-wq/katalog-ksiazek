@@ -4,50 +4,106 @@ export interface RemoteBookMatch {
   author: string;
   isbn?: string;
   publishYear?: number;
-  coverId?: number;
+  thumbnailUrl?: string;
 }
 
-interface OpenLibraryDoc {
-  key?: string;
+interface GoogleBooksIndustryIdentifier {
+  type?: string;
+  identifier?: string;
+}
+
+interface GoogleBooksVolumeInfo {
   title?: string;
-  author_name?: string[];
-  isbn?: string[];
-  first_publish_year?: number;
-  cover_i?: number;
+  subtitle?: string;
+  authors?: string[];
+  publishedDate?: string;
+  industryIdentifiers?: GoogleBooksIndustryIdentifier[];
+  imageLinks?: {
+    thumbnail?: string;
+    smallThumbnail?: string;
+  };
 }
 
-interface OpenLibrarySearchResponse {
-  docs?: OpenLibraryDoc[];
+interface GoogleBooksItem {
+  id?: string;
+  volumeInfo?: GoogleBooksVolumeInfo;
 }
 
-const OPEN_LIBRARY_BASE_URL = "https://openlibrary.org/search.json";
+interface GoogleBooksSearchResponse {
+  items?: GoogleBooksItem[];
+}
 
-function buildSearchUrl(title: string, author: string) {
-  const params = new URLSearchParams();
+const GOOGLE_BOOKS_BASE_URL = "https://www.googleapis.com/books/v1/volumes";
+
+function normalizeIsbn(value?: string) {
+  return (value ?? "").replace(/[^0-9Xx]/g, "").toUpperCase();
+}
+
+function parsePublishYear(value?: string) {
+  if (!value) {
+    return undefined;
+  }
+
+  const match = value.match(/\b(\d{4})\b/);
+  return match ? Number(match[1]) : undefined;
+}
+
+function pickPreferredIsbn(
+  identifiers?: GoogleBooksIndustryIdentifier[]
+) {
+  if (!identifiers?.length) {
+    return undefined;
+  }
+
+  const isbn13 = identifiers.find((item) => item.type === "ISBN_13")?.identifier;
+  const isbn10 = identifiers.find((item) => item.type === "ISBN_10")?.identifier;
+
+  return isbn13 ?? isbn10 ?? identifiers[0]?.identifier;
+}
+
+function buildGoogleBooksQuery(title: string, author: string, isbn?: string) {
+  const tokens: string[] = [];
+  const normalizedIsbn = normalizeIsbn(isbn);
+
+  if (normalizedIsbn) {
+    tokens.push(`isbn:${normalizedIsbn}`);
+  }
 
   if (title.trim()) {
-    params.set("title", title.trim());
+    tokens.push(`intitle:${title.trim()}`);
   }
 
   if (author.trim()) {
-    params.set("author", author.trim());
+    tokens.push(`inauthor:${author.trim()}`);
   }
 
-  params.set("language", "pol");
-  params.set("limit", "8");
-
-  return `${OPEN_LIBRARY_BASE_URL}?${params.toString()}`;
+  return tokens.join(" ");
 }
 
-export async function searchBooksOnline(
-  title: string,
-  author: string
-): Promise<RemoteBookMatch[]> {
-  if (!title.trim() && !author.trim()) {
-    return [];
+function buildBroadQuery(title: string, author: string) {
+  return [title.trim(), author.trim()].filter(Boolean).join(" ");
+}
+
+function buildSearchUrl(query: string, langRestrict?: string) {
+  const params = new URLSearchParams();
+  params.set("q", query);
+  params.set("printType", "books");
+  params.set("orderBy", "relevance");
+  params.set("maxResults", "10");
+  params.set(
+    "fields",
+    "items(id,volumeInfo(title,subtitle,authors,publishedDate,industryIdentifiers,imageLinks))"
+  );
+
+  if (langRestrict) {
+    params.set("langRestrict", langRestrict);
   }
 
-  const response = await fetch(buildSearchUrl(title, author), {
+  return `${GOOGLE_BOOKS_BASE_URL}?${params.toString()}`;
+}
+
+async function fetchGoogleBooks(query: string, langRestrict?: string) {
+  const response = await fetch(buildSearchUrl(query, langRestrict), {
     method: "GET",
     headers: {
       Accept: "application/json"
@@ -58,16 +114,79 @@ export async function searchBooksOnline(
     throw new Error(`Wyszukiwanie online nie powiodlo sie (${response.status}).`);
   }
 
-  const payload = (await response.json()) as OpenLibrarySearchResponse;
+  return (await response.json()) as GoogleBooksSearchResponse;
+}
 
-  return (payload.docs ?? [])
-    .filter((doc) => doc.title && (doc.author_name?.length ?? 0) > 0)
-    .map((doc) => ({
-      key: doc.key ?? `${doc.title}-${doc.author_name?.[0] ?? "unknown"}`,
-      title: doc.title ?? "",
-      author: doc.author_name?.[0] ?? "",
-      isbn: doc.isbn?.[0],
-      publishYear: doc.first_publish_year,
-      coverId: doc.cover_i
-    }));
+function mapGoogleBooksItems(items?: GoogleBooksItem[]) {
+  return (items ?? [])
+    .filter((item) => item.volumeInfo?.title)
+    .map<RemoteBookMatch>((item) => {
+      const volumeInfo = item.volumeInfo ?? {};
+      const preferredIsbn = pickPreferredIsbn(volumeInfo.industryIdentifiers);
+      const title = [volumeInfo.title, volumeInfo.subtitle].filter(Boolean).join(": ");
+
+      return {
+        key:
+          item.id ??
+          `${volumeInfo.title ?? "unknown"}-${volumeInfo.authors?.[0] ?? "unknown"}`,
+        title,
+        author: volumeInfo.authors?.join(", ") ?? "",
+        isbn: preferredIsbn,
+        publishYear: parsePublishYear(volumeInfo.publishedDate),
+        thumbnailUrl:
+          volumeInfo.imageLinks?.thumbnail ?? volumeInfo.imageLinks?.smallThumbnail
+      };
+    })
+    .filter((item) => item.title && item.author);
+}
+
+export async function searchBooksOnline(
+  title: string,
+  author: string,
+  isbn?: string
+): Promise<RemoteBookMatch[]> {
+  const preciseQuery = buildGoogleBooksQuery(title, author, isbn);
+  const broadQuery = buildBroadQuery(title, author);
+
+  if (!preciseQuery && !broadQuery) {
+    return [];
+  }
+
+  const seenKeys = new Set<string>();
+  const appendUniqueResults = (results: RemoteBookMatch[]) =>
+    results.filter((result) => {
+      const dedupeKey = `${result.title}|${result.author}|${result.isbn ?? ""}`.toLowerCase();
+
+      if (seenKeys.has(dedupeKey)) {
+        return false;
+      }
+
+      seenKeys.add(dedupeKey);
+      return true;
+    });
+
+  const searchPlans = [
+    preciseQuery ? { query: preciseQuery, langRestrict: "pl" } : null,
+    preciseQuery ? { query: preciseQuery, langRestrict: undefined } : null,
+    broadQuery && broadQuery !== preciseQuery
+      ? { query: broadQuery, langRestrict: "pl" }
+      : null,
+    broadQuery && broadQuery !== preciseQuery
+      ? { query: broadQuery, langRestrict: undefined }
+      : null
+  ].filter(Boolean) as Array<{ query: string; langRestrict?: string }>;
+
+  const collectedResults: RemoteBookMatch[] = [];
+
+  for (const plan of searchPlans) {
+    const payload = await fetchGoogleBooks(plan.query, plan.langRestrict);
+    const mappedResults = appendUniqueResults(mapGoogleBooksItems(payload.items));
+    collectedResults.push(...mappedResults);
+
+    if (collectedResults.length >= 8) {
+      return collectedResults.slice(0, 8);
+    }
+  }
+
+  return collectedResults.slice(0, 8);
 }

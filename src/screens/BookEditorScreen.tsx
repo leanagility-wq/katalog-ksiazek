@@ -154,7 +154,11 @@ export function BookEditorScreen({
     setSearchError(null);
 
     try {
-      const results = await searchBooksOnline(draft.title, draft.author);
+      const results = await searchBooksOnline(
+        draft.title,
+        draft.author,
+        draft.isbn
+      );
       setSearchResults(results);
 
       if (!results.length) {
