@@ -11,6 +11,7 @@ export interface Book {
   author: string;
   genre?: string;
   isbn?: string;
+  remoteLookupStatus?: "not_found";
   shelfLocation?: string;
   imageUri?: string;
   ocrText: string;

@@ -22,6 +22,7 @@ class SQLiteBookRepository implements BookRepository {
       author: normalizeStoredText(book.author) ?? "",
       genre: normalizeStoredText(book.genre),
       isbn: normalizeStoredText(book.isbn),
+      remoteLookupStatus: book.remoteLookupStatus,
       shelfLocation: normalizeStoredText(book.shelfLocation),
       imageUri: normalizeStoredText(book.imageUri),
       ocrText: normalizeStoredText(book.ocrText) ?? "",
@@ -33,7 +34,7 @@ class SQLiteBookRepository implements BookRepository {
   private buildSaveStatement(book: Book) {
     return `
       INSERT INTO books (
-        id, title, author, genre, isbn, shelfLocation, imageUri, ocrText,
+        id, title, author, genre, isbn, remoteLookupStatus, shelfLocation, imageUri, ocrText,
         price, borrowedTo, notes, status, createdAt, updatedAt
       )
       VALUES (
@@ -42,6 +43,7 @@ class SQLiteBookRepository implements BookRepository {
         ${toSqlValue(book.author)},
         ${toSqlValue(book.genre)},
         ${toSqlValue(book.isbn)},
+        ${toSqlValue(book.remoteLookupStatus)},
         ${toSqlValue(book.shelfLocation)},
         ${toSqlValue(book.imageUri)},
         ${toSqlValue(book.ocrText)},
@@ -57,6 +59,7 @@ class SQLiteBookRepository implements BookRepository {
         author = excluded.author,
         genre = excluded.genre,
         isbn = excluded.isbn,
+        remoteLookupStatus = excluded.remoteLookupStatus,
         shelfLocation = excluded.shelfLocation,
         imageUri = excluded.imageUri,
         ocrText = excluded.ocrText,
@@ -80,6 +83,7 @@ class SQLiteBookRepository implements BookRepository {
           author,
           genre,
           isbn,
+          remoteLookupStatus,
           shelfLocation,
           imageUri,
           ocrText,

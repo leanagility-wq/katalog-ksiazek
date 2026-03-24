@@ -15,6 +15,7 @@ async function createSchema(db: SQLiteDatabase) {
       author TEXT NOT NULL,
       genre TEXT,
       isbn TEXT,
+      remoteLookupStatus TEXT,
       shelfLocation TEXT,
       imageUri TEXT,
       ocrText TEXT NOT NULL,
@@ -33,6 +34,10 @@ async function createSchema(db: SQLiteDatabase) {
   if (!columns.some((column) => column.name === "genre")) {
     await db.execAsync("ALTER TABLE books ADD COLUMN genre TEXT;");
   }
+
+  if (!columns.some((column) => column.name === "remoteLookupStatus")) {
+    await db.execAsync("ALTER TABLE books ADD COLUMN remoteLookupStatus TEXT;");
+  }
 }
 
 async function seedDatabase(db: SQLiteDatabase) {
@@ -47,7 +52,7 @@ async function seedDatabase(db: SQLiteDatabase) {
   for (const book of mockBooks) {
     await db.execAsync(`
       INSERT INTO books (
-        id, title, author, genre, isbn, shelfLocation, imageUri, ocrText,
+        id, title, author, genre, isbn, remoteLookupStatus, shelfLocation, imageUri, ocrText,
         price, borrowedTo, notes, status, createdAt, updatedAt
       )
       VALUES (
@@ -56,6 +61,7 @@ async function seedDatabase(db: SQLiteDatabase) {
         ${toSqlValue(book.author)},
         ${toSqlValue(book.genre)},
         ${toSqlValue(book.isbn)},
+        ${toSqlValue(book.remoteLookupStatus)},
         ${toSqlValue(book.shelfLocation)},
         ${toSqlValue(book.imageUri)},
         ${toSqlValue(book.ocrText)},
