@@ -15,6 +15,7 @@ import { BookListItem } from "@/components/BookListItem";
 import { PrimaryButton } from "@/components/PrimaryButton";
 import { SectionCard } from "@/components/SectionCard";
 import {
+  RemoteLookupError,
   pickBestRemoteBookMatch,
   searchBooksOnline
 } from "@/features/catalog/bookLookupService";
@@ -27,10 +28,16 @@ import { Book, BookStatus } from "@/types/book";
 type QuickEditMode = "status" | "location" | null;
 const CATALOG_PAGE_SIZE = 40;
 const ALL_GENRES_FILTER = "__all__";
+const ENRICHMENT_SAVE_CHUNK_SIZE = 10;
+const ENRICHMENT_REQUEST_DELAY_MS = 250;
 type QuickSelectionFilter = "no_location" | "no_isbn" | "no_genre" | null;
 
 interface LibraryScreenProps {
   onStartScan: () => void;
+}
+
+function delay(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 export function LibraryScreen({ onStartScan }: LibraryScreenProps) {
@@ -340,10 +347,22 @@ export function LibraryScreen({ onStartScan }: LibraryScreenProps) {
 
     setIsEnrichingMissingIsbn(true);
     setBatchActionMessage(null);
+    let pendingBooks: Book[] = [];
+    let savedUpdatesCount = 0;
+    let processedCount = 0;
+
+    const flushPendingBooks = async () => {
+      if (!pendingBooks.length) {
+        return;
+      }
+
+      const booksToSave = [...pendingBooks];
+      pendingBooks = [];
+      await saveBooksBulk(booksToSave);
+      savedUpdatesCount += booksToSave.length;
+    };
 
     try {
-      const updatedBooks: Book[] = [];
-
       for (const [index, book] of booksMissingData.entries()) {
         setIsbnEnrichmentMessage(
           appText.library.enrichingMissingDataProgress(
@@ -353,46 +372,76 @@ export function LibraryScreen({ onStartScan }: LibraryScreenProps) {
           )
         );
 
-        const results = await searchBooksOnline(
-          book.title,
-          book.author,
-          undefined,
-          book.genre
-        );
-        const bestMatch = pickBestRemoteBookMatch(results, {
-          title: book.title,
-          author: book.author,
-          genre: book.genre
-        });
+        try {
+          const results = await searchBooksOnline(
+            book.title,
+            book.author,
+            undefined,
+            book.genre
+          );
+          const bestMatch = pickBestRemoteBookMatch(results, {
+            title: book.title,
+            author: book.author,
+            genre: book.genre
+          });
 
-        if (!bestMatch?.isbn) {
-          continue;
+          processedCount += 1;
+
+          if (bestMatch && (bestMatch.isbn || bestMatch.genre)) {
+            pendingBooks.push({
+              ...book,
+              title: book.title || bestMatch.title,
+              author: book.author || bestMatch.author,
+              genre: book.genre?.trim() ? book.genre : bestMatch.genre,
+              isbn: book.isbn?.trim() ? book.isbn : bestMatch.isbn,
+              updatedAt: book.updatedAt
+            });
+          }
+
+          if (pendingBooks.length >= ENRICHMENT_SAVE_CHUNK_SIZE) {
+            await flushPendingBooks();
+          }
+
+          if (index < booksMissingData.length - 1) {
+            await delay(ENRICHMENT_REQUEST_DELAY_MS);
+          }
+        } catch (error) {
+          await flushPendingBooks();
+
+          if (error instanceof RemoteLookupError && error.status === 429) {
+            setIsbnEnrichmentMessage(
+              `${appText.library.enrichingMissingDataRateLimited} ${appText.library.enrichingMissingDataPartial(
+                savedUpdatesCount,
+                processedCount,
+                booksMissingData.length
+              )}`
+            );
+            return;
+          }
         }
-
-        updatedBooks.push({
-          ...book,
-          title: book.title || bestMatch.title,
-          author: book.author || bestMatch.author,
-          genre: book.genre?.trim() ? book.genre : bestMatch.genre,
-          isbn: book.isbn?.trim() ? book.isbn : bestMatch.isbn,
-          updatedAt: book.updatedAt
-        });
       }
 
-      if (updatedBooks.length) {
-        await saveBooksBulk(updatedBooks);
-      }
+      await flushPendingBooks();
 
       setIsbnEnrichmentMessage(
         appText.library.enrichingMissingDataDone(
-          updatedBooks.length,
+          savedUpdatesCount,
           booksMissingData.length
         )
       );
     } catch (error) {
-      setIsbnEnrichmentMessage(
-        error instanceof Error ? error.message : errorMessage
-      );
+      await flushPendingBooks();
+      let fallbackMessage = error instanceof Error ? error.message : errorMessage;
+
+      if (error instanceof RemoteLookupError && error.status === 429) {
+        fallbackMessage = `${appText.library.enrichingMissingDataRateLimited} ${appText.library.enrichingMissingDataPartial(
+          savedUpdatesCount,
+          processedCount,
+          booksMissingData.length
+        )}`;
+      }
+
+      setIsbnEnrichmentMessage(fallbackMessage);
     } finally {
       setIsEnrichingMissingIsbn(false);
     }

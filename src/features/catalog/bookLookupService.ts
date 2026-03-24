@@ -41,7 +41,21 @@ interface MatchContext {
   genre?: string;
 }
 
+export class RemoteLookupError extends Error {
+  status?: number;
+  retryAfterMs?: number;
+
+  constructor(message: string, status?: number, retryAfterMs?: number) {
+    super(message);
+    this.name = "RemoteLookupError";
+    this.status = status;
+    this.retryAfterMs = retryAfterMs;
+  }
+}
+
 const GOOGLE_BOOKS_BASE_URL = "https://www.googleapis.com/books/v1/volumes";
+const DEFAULT_RETRY_AFTER_MS = 2500;
+const MAX_LOOKUP_RETRIES = 4;
 const GENRE_TRANSLATIONS: Record<string, string> = {
   fiction: "Proza",
   "science fiction": "Science fiction",
@@ -205,19 +219,62 @@ function buildSearchUrl(query: string, langRestrict?: string) {
   return `${GOOGLE_BOOKS_BASE_URL}?${params.toString()}`;
 }
 
-async function fetchGoogleBooks(query: string, langRestrict?: string) {
-  const response = await fetch(buildSearchUrl(query, langRestrict), {
-    method: "GET",
-    headers: {
-      Accept: "application/json"
-    }
-  });
+function delay(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
 
-  if (!response.ok) {
-    throw new Error(`Wyszukiwanie online nie powiodlo sie (${response.status}).`);
+function parseRetryAfterMs(value: string | null) {
+  if (!value) {
+    return undefined;
   }
 
-  return (await response.json()) as GoogleBooksSearchResponse;
+  const numericSeconds = Number(value);
+
+  if (Number.isFinite(numericSeconds) && numericSeconds >= 0) {
+    return numericSeconds * 1000;
+  }
+
+  const dateMs = Date.parse(value);
+
+  if (Number.isNaN(dateMs)) {
+    return undefined;
+  }
+
+  return Math.max(dateMs - Date.now(), 0);
+}
+
+async function fetchGoogleBooks(query: string, langRestrict?: string) {
+  for (let attempt = 0; attempt < MAX_LOOKUP_RETRIES; attempt += 1) {
+    const response = await fetch(buildSearchUrl(query, langRestrict), {
+      method: "GET",
+      headers: {
+        Accept: "application/json"
+      }
+    });
+
+    if (response.ok) {
+      return (await response.json()) as GoogleBooksSearchResponse;
+    }
+
+    const retryAfterMs =
+      parseRetryAfterMs(response.headers.get("Retry-After")) ??
+      DEFAULT_RETRY_AFTER_MS * (attempt + 1);
+    const isRetryable = response.status === 429 || response.status >= 500;
+    const hasMoreRetries = attempt < MAX_LOOKUP_RETRIES - 1;
+
+    if (isRetryable && hasMoreRetries) {
+      await delay(retryAfterMs);
+      continue;
+    }
+
+    throw new RemoteLookupError(
+      `Wyszukiwanie online nie powiodło się (${response.status}).`,
+      response.status,
+      retryAfterMs
+    );
+  }
+
+  throw new RemoteLookupError("Wyszukiwanie online nie powiodło się.");
 }
 
 function mapGoogleBooksItems(items?: GoogleBooksItem[]) {

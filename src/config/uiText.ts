@@ -24,10 +24,18 @@ export const appText = {
       `Sprawdzam ${current} z ${total}: ${title}`,
     enrichingMissingDataDone: (updated: number, total: number) =>
       `Uzupełniono dane dla ${updated} z ${total} zaznaczonych książek.`,
+    enrichingMissingDataPartial: (
+      updated: number,
+      processed: number,
+      total: number
+    ) =>
+      `Zapisano ${updated} zmian. Przetworzono ${processed} z ${total} książek przed zatrzymaniem batcha.`,
     enrichingMissingDataNothingToDo:
       "Zaznaczone książki mają już komplet ISBN i gatunku.",
     enrichingMissingDataSelectBooks:
       "Najpierw zaznacz książki, którym chcesz uzupełnić dane z sieci.",
+    enrichingMissingDataRateLimited:
+      "Google Books chwilowo ograniczyło zapytania. Zapisane wyniki już zostały zachowane.",
     genreFilterLabel: "Filtr gatunku",
     genreFilterAll: "Wszystkie gatunki",
     searchPlaceholder: "Szukaj po tytule, autorze, gatunku, ISBN albo lokalizacji",
