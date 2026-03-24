@@ -7,6 +7,7 @@ import {
   STATUS_STYLES
 } from "@/config/bookUi";
 import { PrimaryButton } from "@/components/PrimaryButton";
+import { normalizeGenreLabel } from "@/features/catalog/genreCatalog";
 import { Book, BookStatus } from "@/types/book";
 
 type QuickEditMode = "status" | "location" | null;
@@ -43,6 +44,7 @@ export function BookListItem({
   onQuickLocationSave
 }: BookListItemProps) {
   const statusStyle = STATUS_STYLES[book.status];
+  const bookGenre = normalizeGenreLabel(book.genre);
   const [locationDraft, setLocationDraft] = useState(book.shelfLocation ?? "");
 
   useEffect(() => {
@@ -91,9 +93,9 @@ export function BookListItem({
                   {book.shelfLocation || "Dodaj lokalizację"}
                 </Text>
               </Pressable>
-              {book.genre ? (
+              {bookGenre ? (
                 <Text numberOfLines={1} style={styles.metaPill}>
-                  <Text style={styles.metaPillText}>{book.genre}</Text>
+                  <Text style={styles.metaPillText}>{bookGenre}</Text>
                 </Text>
               ) : null}
             </View>

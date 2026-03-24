@@ -9,6 +9,7 @@ import {
   setStoredSavedGenres,
   setStoredSavedLocations
 } from "@/storage/secureStore";
+import { CORE_GENRES, normalizeGenreLabel } from "@/features/catalog/genreCatalog";
 
 interface SettingsState {
   openAIApiKey: string;
@@ -24,6 +25,10 @@ interface SettingsState {
   saveSavedGenres: (genres: string[]) => Promise<void>;
 }
 
+function isDefined<T>(value: T | undefined): value is T {
+  return value !== undefined;
+}
+
 function normalizeValues(values: string[]) {
   return Array.from(
     new Set(
@@ -32,6 +37,16 @@ function normalizeValues(values: string[]) {
         .filter(Boolean)
     )
   ).sort((left, right) => left.localeCompare(right, "pl"));
+}
+
+function normalizeGenreValues(values: string[]) {
+  const normalizedGenres = values
+    .map((value) => normalizeGenreLabel(value))
+    .filter(isDefined);
+
+  return Array.from(new Set([...CORE_GENRES, ...normalizedGenres])).sort((left, right) =>
+    left.localeCompare(right, "pl")
+  );
 }
 
 export const useSettingsStore = create<SettingsState>((set) => ({
@@ -52,7 +67,7 @@ export const useSettingsStore = create<SettingsState>((set) => ({
       set({
         openAIApiKey: apiKey ?? "",
         savedLocations: normalizeValues(savedLocations),
-        savedGenres: normalizeValues(savedGenres),
+        savedGenres: normalizeGenreValues(savedGenres),
         isLoaded: true,
         errorMessage: null
       });
@@ -128,7 +143,7 @@ export const useSettingsStore = create<SettingsState>((set) => ({
     }
   },
   saveSavedGenres: async (genres) => {
-    const normalizedGenres = normalizeValues(genres);
+    const normalizedGenres = normalizeGenreValues(genres);
     set({ isSaving: true, errorMessage: null });
 
     try {

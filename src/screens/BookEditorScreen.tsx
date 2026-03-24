@@ -23,6 +23,7 @@ import {
   RemoteBookMatch,
   searchBooksOnline
 } from "@/features/catalog/bookLookupService";
+import { normalizeGenreLabel } from "@/features/catalog/genreCatalog";
 import { useLibraryStore } from "@/store/useLibraryStore";
 import { useSettingsStore } from "@/store/useSettingsStore";
 import { Book, BookStatus } from "@/types/book";
@@ -100,7 +101,7 @@ function toBook(draft: BookDraft): Book {
     id: draft.id,
     title: draft.title.trim(),
     author: draft.author.trim(),
-    genre: draft.genre.trim() || undefined,
+    genre: normalizeGenreLabel(draft.genre),
     isbn: draft.isbn.trim() || undefined,
     shelfLocation: draft.shelfLocation.trim() || undefined,
     ocrText: draft.ocrText.trim(),
@@ -184,7 +185,7 @@ export function BookEditorScreen({
       ...draft,
       title: result.title || draft.title,
       author: result.author || draft.author,
-      genre: result.genre ?? draft.genre,
+      genre: normalizeGenreLabel(result.genre ?? draft.genre) ?? "",
       isbn: result.isbn ?? draft.isbn
     };
 

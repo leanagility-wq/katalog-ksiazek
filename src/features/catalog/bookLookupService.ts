@@ -1,3 +1,5 @@
+import { normalizeGenreLabel } from "@/features/catalog/genreCatalog";
+
 export interface RemoteBookMatch {
   key: string;
   title: string;
@@ -56,49 +58,6 @@ export class RemoteLookupError extends Error {
 const GOOGLE_BOOKS_BASE_URL = "https://www.googleapis.com/books/v1/volumes";
 const DEFAULT_RETRY_AFTER_MS = 2500;
 const MAX_LOOKUP_RETRIES = 4;
-const GENRE_TRANSLATIONS: Record<string, string> = {
-  fiction: "Proza",
-  "science fiction": "Science fiction",
-  fantasy: "Fantastyka",
-  horror: "Horror",
-  mystery: "Kryminał",
-  thriller: "Thriller",
-  suspense: "Thriller",
-  detective: "Kryminał",
-  crime: "Kryminał",
-  romance: "Romans",
-  poetry: "Poezja",
-  drama: "Dramat",
-  classics: "Klasyka",
-  classic: "Klasyka",
-  history: "Historia",
-  historical: "Powieść historyczna",
-  biography: "Biografia",
-  autobiography: "Autobiografia",
-  memoir: "Wspomnienia",
-  philosophy: "Filozofia",
-  psychology: "Psychologia",
-  religion: "Religia",
-  spirituality: "Duchowość",
-  education: "Edukacja",
-  study: "Edukacja",
-  school: "Edukacja",
-  textbook: "Podręcznik",
-  technology: "Technologia",
-  computers: "Informatyka",
-  programming: "Programowanie",
-  business: "Biznes",
-  economics: "Ekonomia",
-  self: "Rozwój osobisty",
-  cooking: "Kuchnia",
-  travel: "Podróże",
-  art: "Sztuka",
-  music: "Muzyka",
-  comics: "Komiks",
-  juvenile: "Literatura młodzieżowa",
-  children: "Literatura dziecięca",
-  young: "Literatura młodzieżowa"
-};
 
 function normalizeIsbn(value?: string) {
   return (value ?? "").replace(/[^0-9Xx]/g, "").toUpperCase();
@@ -132,33 +91,7 @@ function parsePublishYear(value?: string) {
   return match ? Number(match[1]) : undefined;
 }
 
-function toPolishGenreLabel(value?: string) {
-  if (!value?.trim()) {
-    return undefined;
-  }
-
-  const normalizedValue = value.trim();
-  const lowerValue = normalizedValue.toLowerCase();
-
-  if (GENRE_TRANSLATIONS[lowerValue]) {
-    return GENRE_TRANSLATIONS[lowerValue];
-  }
-
-  const translatedParts = normalizedValue
-    .split(/[/:,;]/)
-    .map((part) => part.trim())
-    .filter(Boolean)
-    .map((part) => {
-      const lowered = part.toLowerCase();
-      return GENRE_TRANSLATIONS[lowered] ?? part;
-    });
-
-  return translatedParts.join(" / ");
-}
-
-function pickPreferredIsbn(
-  identifiers?: GoogleBooksIndustryIdentifier[]
-) {
+function pickPreferredIsbn(identifiers?: GoogleBooksIndustryIdentifier[]) {
   if (!identifiers?.length) {
     return undefined;
   }
@@ -291,7 +224,7 @@ function mapGoogleBooksItems(items?: GoogleBooksItem[]) {
           `${volumeInfo.title ?? "unknown"}-${volumeInfo.authors?.[0] ?? "unknown"}`,
         title,
         author: volumeInfo.authors?.join(", ") ?? "",
-        genre: toPolishGenreLabel(volumeInfo.categories?.[0]),
+        genre: normalizeGenreLabel(volumeInfo.categories?.join(" / ")),
         isbn: preferredIsbn,
         publishYear: parsePublishYear(volumeInfo.publishedDate),
         thumbnailUrl:

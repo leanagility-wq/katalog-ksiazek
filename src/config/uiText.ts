@@ -43,6 +43,8 @@ export const appText = {
     batchHideButton: "Ukryj operacje",
     genreFilterLabel: "Filtr gatunku",
     genreFilterAll: "Wszystkie gatunki",
+    locationFilterLabel: "Filtr lokalizacji",
+    locationFilterAll: "Wszystkie lokalizacje",
     searchPlaceholder: "Szukaj po tytule, autorze, gatunku, ISBN albo lokalizacji",
     batchSelectedLabel: (count: number) => `Zaznaczono: ${count}`,
     batchModeHint: "Przytrzymaj tytuł książki, aby zaznaczać wiele pozycji naraz.",
