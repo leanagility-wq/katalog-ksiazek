@@ -27,6 +27,7 @@ import { Book, BookStatus } from "@/types/book";
 type QuickEditMode = "status" | "location" | null;
 const CATALOG_PAGE_SIZE = 40;
 const ALL_GENRES_FILTER = "__all__";
+type QuickSelectionFilter = "no_location" | "no_isbn" | "no_genre" | null;
 
 interface LibraryScreenProps {
   onStartScan: () => void;
@@ -59,6 +60,8 @@ export function LibraryScreen({ onStartScan }: LibraryScreenProps) {
     null
   );
   const [renderLimit, setRenderLimit] = useState(CATALOG_PAGE_SIZE);
+  const [activeQuickSelection, setActiveQuickSelection] =
+    useState<QuickSelectionFilter>(null);
   const selectedBookIdsRef = useRef<string[]>([]);
 
   const isSelectionMode = selectedBookIds.length > 0;
@@ -165,11 +168,6 @@ export function LibraryScreen({ onStartScan }: LibraryScreenProps) {
     [visibleBooks]
   );
 
-  const visibleNeedsReviewCount = useMemo(
-    () => visibleBooks.filter((book) => book.status === "needs_review").length,
-    [visibleBooks]
-  );
-
   const renderedBooks = useMemo(
     () => visibleBooks.slice(0, renderLimit),
     [renderLimit, visibleBooks]
@@ -196,6 +194,7 @@ export function LibraryScreen({ onStartScan }: LibraryScreenProps) {
     setSelectedBookIds([]);
     setBatchLocationDraft("");
     setBatchActionMessage(null);
+    setActiveQuickSelection(null);
   };
 
   const handleQuickEditToggle = (
@@ -237,32 +236,28 @@ export function LibraryScreen({ onStartScan }: LibraryScreenProps) {
   };
 
   const selectBooksWithoutLocation = () => {
+    setActiveQuickSelection("no_location");
     replaceSelection(
       visibleBooks.filter((book) => !book.shelfLocation?.trim()).map((book) => book.id)
     );
   };
 
   const selectBooksWithoutIsbn = () => {
+    setActiveQuickSelection("no_isbn");
     replaceSelection(
       visibleBooks.filter((book) => !book.isbn?.trim()).map((book) => book.id)
     );
   };
 
   const selectBooksWithoutGenre = () => {
+    setActiveQuickSelection("no_genre");
     replaceSelection(
       visibleBooks.filter((book) => !book.genre?.trim()).map((book) => book.id)
     );
   };
 
-  const selectBooksNeedingReview = () => {
-    replaceSelection(
-      visibleBooks
-        .filter((book) => book.status === "needs_review")
-        .map((book) => book.id)
-    );
-  };
-
   const selectAllVisibleBooks = () => {
+    setActiveQuickSelection(null);
     replaceSelection(visibleBooks.map((book) => book.id));
   };
 
@@ -581,10 +576,20 @@ export function LibraryScreen({ onStartScan }: LibraryScreenProps) {
               onPress={selectBooksWithoutLocation}
               style={({ pressed }) => [
                 styles.visibleStatChip,
+                activeQuickSelection === "no_location"
+                  ? styles.visibleStatChipActive
+                  : null,
                 pressed ? styles.visibleStatChipPressed : null
               ]}
             >
-              <Text style={styles.visibleStatLabel}>
+              <Text
+                style={[
+                  styles.visibleStatLabel,
+                  activeQuickSelection === "no_location"
+                    ? styles.visibleStatLabelActive
+                    : null
+                ]}
+              >
                 {appText.library.visibleWithoutLocationLabel(visibleWithoutLocationCount)}
               </Text>
             </Pressable>
@@ -592,10 +597,20 @@ export function LibraryScreen({ onStartScan }: LibraryScreenProps) {
               onPress={selectBooksWithoutIsbn}
               style={({ pressed }) => [
                 styles.visibleStatChip,
+                activeQuickSelection === "no_isbn"
+                  ? styles.visibleStatChipActive
+                  : null,
                 pressed ? styles.visibleStatChipPressed : null
               ]}
             >
-              <Text style={styles.visibleStatLabel}>
+              <Text
+                style={[
+                  styles.visibleStatLabel,
+                  activeQuickSelection === "no_isbn"
+                    ? styles.visibleStatLabelActive
+                    : null
+                ]}
+              >
                 {appText.library.visibleWithoutIsbnLabel(visibleWithoutIsbnCount)}
               </Text>
             </Pressable>
@@ -603,18 +618,23 @@ export function LibraryScreen({ onStartScan }: LibraryScreenProps) {
               onPress={selectBooksWithoutGenre}
               style={({ pressed }) => [
                 styles.visibleStatChip,
+                activeQuickSelection === "no_genre"
+                  ? styles.visibleStatChipActive
+                  : null,
                 pressed ? styles.visibleStatChipPressed : null
               ]}
             >
-              <Text style={styles.visibleStatLabel}>
+              <Text
+                style={[
+                  styles.visibleStatLabel,
+                  activeQuickSelection === "no_genre"
+                    ? styles.visibleStatLabelActive
+                    : null
+                ]}
+              >
                 {appText.library.visibleWithoutGenreLabel(visibleWithoutGenreCount)}
               </Text>
             </Pressable>
-            <View style={styles.visibleStatChip}>
-              <Text style={styles.visibleStatLabel}>
-                {appText.library.visibleNeedsReviewLabel(visibleNeedsReviewCount)}
-              </Text>
-            </View>
           </View>
 
           <View style={styles.lazyInfoRow}>
@@ -661,19 +681,6 @@ export function LibraryScreen({ onStartScan }: LibraryScreenProps) {
                 >
                   <Text style={styles.batchShortcutLabel}>
                     {appText.library.selectNoLocation}
-                  </Text>
-                </Pressable>
-                <Pressable
-                  onPress={selectBooksNeedingReview}
-                  style={({ pressed }) => [
-                    styles.batchShortcutChip,
-                    pressed ? styles.batchChipPressed : null,
-                    isApplyingBatch ? styles.batchChipDisabled : null
-                  ]}
-                  disabled={isApplyingBatch}
-                >
-                  <Text style={styles.batchShortcutLabel}>
-                    {appText.library.selectNeedsReview}
                   </Text>
                 </Pressable>
                 <Pressable
@@ -1014,6 +1021,9 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     backgroundColor: "#f4ede2"
   },
+  visibleStatChipActive: {
+    backgroundColor: "#704d2e"
+  },
   visibleStatChipPressed: {
     opacity: 0.82
   },
@@ -1021,6 +1031,9 @@ const styles = StyleSheet.create({
     color: "#6b5640",
     fontSize: 12,
     fontWeight: "700"
+  },
+  visibleStatLabelActive: {
+    color: "#fff8ee"
   },
   lazyInfoRow: {
     flexDirection: "row",
