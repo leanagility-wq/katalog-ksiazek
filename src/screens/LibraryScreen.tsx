@@ -160,6 +160,11 @@ export function LibraryScreen({ onStartScan }: LibraryScreenProps) {
     [visibleBooks]
   );
 
+  const visibleWithoutGenreCount = useMemo(
+    () => visibleBooks.filter((book) => !book.genre?.trim()).length,
+    [visibleBooks]
+  );
+
   const visibleNeedsReviewCount = useMemo(
     () => visibleBooks.filter((book) => book.status === "needs_review").length,
     [visibleBooks]
@@ -240,6 +245,12 @@ export function LibraryScreen({ onStartScan }: LibraryScreenProps) {
   const selectBooksWithoutIsbn = () => {
     replaceSelection(
       visibleBooks.filter((book) => !book.isbn?.trim()).map((book) => book.id)
+    );
+  };
+
+  const selectBooksWithoutGenre = () => {
+    replaceSelection(
+      visibleBooks.filter((book) => !book.genre?.trim()).map((book) => book.id)
     );
   };
 
@@ -577,6 +588,17 @@ export function LibraryScreen({ onStartScan }: LibraryScreenProps) {
             >
               <Text style={styles.visibleStatLabel}>
                 {appText.library.visibleWithoutIsbnLabel(visibleWithoutIsbnCount)}
+              </Text>
+            </Pressable>
+            <Pressable
+              onPress={selectBooksWithoutGenre}
+              style={({ pressed }) => [
+                styles.visibleStatChip,
+                pressed ? styles.visibleStatChipPressed : null
+              ]}
+            >
+              <Text style={styles.visibleStatLabel}>
+                {appText.library.visibleWithoutGenreLabel(visibleWithoutGenreCount)}
               </Text>
             </Pressable>
             <View style={styles.visibleStatChip}>

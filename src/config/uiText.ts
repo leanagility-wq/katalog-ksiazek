@@ -32,6 +32,7 @@ export const appText = {
     batchModeHint: "Przytrzymaj tytuł książki, aby zaznaczać wiele pozycji naraz.",
     visibleWithoutLocationLabel: (count: number) => `Bez lokalizacji: ${count}`,
     visibleWithoutIsbnLabel: (count: number) => `Bez ISBN: ${count}`,
+    visibleWithoutGenreLabel: (count: number) => `Bez gatunku: ${count}`,
     visibleNeedsReviewLabel: (count: number) => `Do poprawy: ${count}`,
     selectAllVisible: "Zaznacz wszystko",
     selectNoLocation: "Bez lokalizacji",
