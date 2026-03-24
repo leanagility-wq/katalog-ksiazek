@@ -72,7 +72,14 @@ export function LibraryScreen({ onStartScan }: LibraryScreenProps) {
 
     const filteredBooks = normalizedQuery
       ? books.filter((book) =>
-          [book.title, book.author, book.isbn, book.shelfLocation, book.notes]
+          [
+            book.title,
+            book.author,
+            book.genre,
+            book.isbn,
+            book.shelfLocation,
+            book.notes
+          ]
             .filter(Boolean)
             .some((value) => value?.toLowerCase().includes(normalizedQuery))
         )

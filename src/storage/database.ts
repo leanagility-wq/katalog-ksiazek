@@ -13,6 +13,7 @@ async function createSchema(db: SQLiteDatabase) {
       id TEXT PRIMARY KEY NOT NULL,
       title TEXT NOT NULL,
       author TEXT NOT NULL,
+      genre TEXT,
       isbn TEXT,
       shelfLocation TEXT,
       imageUri TEXT,
@@ -25,6 +26,13 @@ async function createSchema(db: SQLiteDatabase) {
       updatedAt TEXT NOT NULL
     );
   `);
+
+  const columns =
+    (await db.getAllAsync<{ name: string }>("PRAGMA table_info(books);")) ?? [];
+
+  if (!columns.some((column) => column.name === "genre")) {
+    await db.execAsync("ALTER TABLE books ADD COLUMN genre TEXT;");
+  }
 }
 
 async function seedDatabase(db: SQLiteDatabase) {
@@ -39,13 +47,14 @@ async function seedDatabase(db: SQLiteDatabase) {
   for (const book of mockBooks) {
     await db.execAsync(`
       INSERT INTO books (
-        id, title, author, isbn, shelfLocation, imageUri, ocrText,
+        id, title, author, genre, isbn, shelfLocation, imageUri, ocrText,
         price, borrowedTo, notes, status, createdAt, updatedAt
       )
       VALUES (
         ${toSqlValue(book.id)},
         ${toSqlValue(book.title)},
         ${toSqlValue(book.author)},
+        ${toSqlValue(book.genre)},
         ${toSqlValue(book.isbn)},
         ${toSqlValue(book.shelfLocation)},
         ${toSqlValue(book.imageUri)},

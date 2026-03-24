@@ -2,6 +2,7 @@ export interface RemoteBookMatch {
   key: string;
   title: string;
   author: string;
+  genre?: string;
   isbn?: string;
   publishYear?: number;
   thumbnailUrl?: string;
@@ -16,6 +17,7 @@ interface GoogleBooksVolumeInfo {
   title?: string;
   subtitle?: string;
   authors?: string[];
+  categories?: string[];
   publishedDate?: string;
   industryIdentifiers?: GoogleBooksIndustryIdentifier[];
   imageLinks?: {
@@ -61,7 +63,12 @@ function pickPreferredIsbn(
   return isbn13 ?? isbn10 ?? identifiers[0]?.identifier;
 }
 
-function buildGoogleBooksQuery(title: string, author: string, isbn?: string) {
+function buildGoogleBooksQuery(
+  title: string,
+  author: string,
+  isbn?: string,
+  genre?: string
+) {
   const tokens: string[] = [];
   const normalizedIsbn = normalizeIsbn(isbn);
 
@@ -77,11 +84,15 @@ function buildGoogleBooksQuery(title: string, author: string, isbn?: string) {
     tokens.push(`inauthor:${author.trim()}`);
   }
 
+  if (genre?.trim()) {
+    tokens.push(`subject:${genre.trim()}`);
+  }
+
   return tokens.join(" ");
 }
 
-function buildBroadQuery(title: string, author: string) {
-  return [title.trim(), author.trim()].filter(Boolean).join(" ");
+function buildBroadQuery(title: string, author: string, genre?: string) {
+  return [title.trim(), author.trim(), genre?.trim()].filter(Boolean).join(" ");
 }
 
 function buildSearchUrl(query: string, langRestrict?: string) {
@@ -92,7 +103,7 @@ function buildSearchUrl(query: string, langRestrict?: string) {
   params.set("maxResults", "10");
   params.set(
     "fields",
-    "items(id,volumeInfo(title,subtitle,authors,publishedDate,industryIdentifiers,imageLinks))"
+    "items(id,volumeInfo(title,subtitle,authors,categories,publishedDate,industryIdentifiers,imageLinks))"
   );
 
   if (langRestrict) {
@@ -131,6 +142,7 @@ function mapGoogleBooksItems(items?: GoogleBooksItem[]) {
           `${volumeInfo.title ?? "unknown"}-${volumeInfo.authors?.[0] ?? "unknown"}`,
         title,
         author: volumeInfo.authors?.join(", ") ?? "",
+        genre: volumeInfo.categories?.[0],
         isbn: preferredIsbn,
         publishYear: parsePublishYear(volumeInfo.publishedDate),
         thumbnailUrl:
@@ -143,10 +155,11 @@ function mapGoogleBooksItems(items?: GoogleBooksItem[]) {
 export async function searchBooksOnline(
   title: string,
   author: string,
-  isbn?: string
+  isbn?: string,
+  genre?: string
 ): Promise<RemoteBookMatch[]> {
-  const preciseQuery = buildGoogleBooksQuery(title, author, isbn);
-  const broadQuery = buildBroadQuery(title, author);
+  const preciseQuery = buildGoogleBooksQuery(title, author, isbn, genre);
+  const broadQuery = buildBroadQuery(title, author, genre);
 
   if (!preciseQuery && !broadQuery) {
     return [];

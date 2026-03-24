@@ -23,6 +23,7 @@ class SQLiteBookRepository implements BookRepository {
           id,
           title,
           author,
+          genre,
           isbn,
           shelfLocation,
           imageUri,
@@ -45,6 +46,7 @@ class SQLiteBookRepository implements BookRepository {
       ...book,
       title: normalizeStoredText(book.title) ?? "",
       author: normalizeStoredText(book.author) ?? "",
+      genre: normalizeStoredText(book.genre),
       isbn: normalizeStoredText(book.isbn),
       shelfLocation: normalizeStoredText(book.shelfLocation),
       imageUri: normalizeStoredText(book.imageUri),
@@ -55,13 +57,14 @@ class SQLiteBookRepository implements BookRepository {
 
     await db.execAsync(`
       INSERT INTO books (
-        id, title, author, isbn, shelfLocation, imageUri, ocrText,
+        id, title, author, genre, isbn, shelfLocation, imageUri, ocrText,
         price, borrowedTo, notes, status, createdAt, updatedAt
       )
       VALUES (
         ${toSqlValue(normalizedBook.id)},
         ${toSqlValue(normalizedBook.title)},
         ${toSqlValue(normalizedBook.author)},
+        ${toSqlValue(normalizedBook.genre)},
         ${toSqlValue(normalizedBook.isbn)},
         ${toSqlValue(normalizedBook.shelfLocation)},
         ${toSqlValue(normalizedBook.imageUri)},
@@ -76,6 +79,7 @@ class SQLiteBookRepository implements BookRepository {
       ON CONFLICT(id) DO UPDATE SET
         title = excluded.title,
         author = excluded.author,
+        genre = excluded.genre,
         isbn = excluded.isbn,
         shelfLocation = excluded.shelfLocation,
         imageUri = excluded.imageUri,

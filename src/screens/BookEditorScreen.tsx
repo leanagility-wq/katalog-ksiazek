@@ -31,6 +31,7 @@ type BookDraft = {
   id: string;
   title: string;
   author: string;
+  genre: string;
   isbn: string;
   shelfLocation: string;
   ocrText: string;
@@ -60,6 +61,7 @@ function createDraft(book?: Book | null): BookDraft {
       id: createId(),
       title: "",
       author: "",
+      genre: "",
       isbn: "",
       shelfLocation: "",
       ocrText: "",
@@ -76,6 +78,7 @@ function createDraft(book?: Book | null): BookDraft {
     id: book.id,
     title: book.title,
     author: book.author,
+    genre: book.genre ?? "",
     isbn: book.isbn ?? "",
     shelfLocation: book.shelfLocation ?? "",
     ocrText: book.ocrText,
@@ -97,6 +100,7 @@ function toBook(draft: BookDraft): Book {
     id: draft.id,
     title: draft.title.trim(),
     author: draft.author.trim(),
+    genre: draft.genre.trim() || undefined,
     isbn: draft.isbn.trim() || undefined,
     shelfLocation: draft.shelfLocation.trim() || undefined,
     ocrText: draft.ocrText.trim(),
@@ -157,7 +161,8 @@ export function BookEditorScreen({
       const results = await searchBooksOnline(
         draft.title,
         draft.author,
-        draft.isbn
+        draft.isbn,
+        draft.genre
       );
       setSearchResults(results);
 
@@ -179,6 +184,7 @@ export function BookEditorScreen({
       ...current,
       title: result.title || current.title,
       author: result.author || current.author,
+      genre: result.genre ?? current.genre,
       isbn: result.isbn ?? current.isbn
     }));
   };
@@ -311,6 +317,12 @@ export function BookEditorScreen({
             onChangeText={(value) => updateDraft("author", value)}
             placeholder={appText.editor.fields.authorPlaceholder}
           />
+          <Field
+            label={appText.editor.fields.genre}
+            value={draft.genre}
+            onChangeText={(value) => updateDraft("genre", value)}
+            placeholder={appText.editor.fields.genrePlaceholder}
+          />
           <View style={styles.inlineActions}>
             <PrimaryButton
               label={
@@ -335,6 +347,9 @@ export function BookEditorScreen({
                 >
                   <Text style={styles.resultTitle}>{result.title}</Text>
                   <Text style={styles.resultMeta}>{result.author}</Text>
+                  {result.genre ? (
+                    <Text style={styles.resultMeta}>{result.genre}</Text>
+                  ) : null}
                   <Text style={styles.resultMeta}>
                     {result.publishYear
                       ? appText.editor.firstEditionLabel(result.publishYear)
