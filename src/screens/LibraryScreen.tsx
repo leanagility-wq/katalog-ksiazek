@@ -148,8 +148,14 @@ export function LibraryScreen({ onStartScan }: LibraryScreenProps) {
   const isLookupSelectionContext = useMemo(
     () =>
       selectedBooks.length > 0 &&
-      selectedBooks.every((book) => !book.isbn?.trim() || !book.genre?.trim()),
+      selectedBooks.some((book) => !book.isbn?.trim() || !book.genre?.trim()),
     [selectedBooks]
+  );
+  const isLookupFilterContext = useMemo(
+    () =>
+      !isSelectionMode &&
+      (activeQuickFilter === "no_isbn" || activeQuickFilter === "no_genre"),
+    [activeQuickFilter, isSelectionMode]
   );
   const isLocationSelectionContext = useMemo(
     () =>
@@ -245,6 +251,23 @@ export function LibraryScreen({ onStartScan }: LibraryScreenProps) {
     () => visibleBooks.slice(0, renderLimit),
     [renderLimit, visibleBooks]
   );
+
+  const quickFilteredLookupBooks = useMemo(() => {
+    if (activeQuickFilter !== "no_isbn" && activeQuickFilter !== "no_genre") {
+      return [];
+    }
+
+    return visibleBooks.filter((book) => {
+      if (forceRetryLookup) {
+        return !book.isbn?.trim() || !book.genre?.trim();
+      }
+
+      return (
+        (!book.isbn?.trim() || !book.genre?.trim()) &&
+        book.remoteLookupStatus !== "not_found"
+      );
+    });
+  }, [activeQuickFilter, forceRetryLookup, visibleBooks]);
 
   const canLoadMoreBooks = renderLimit < visibleBooks.length;
 
@@ -423,12 +446,14 @@ export function LibraryScreen({ onStartScan }: LibraryScreenProps) {
   };
 
   const handleEnrichMissingIsbn = async () => {
-    if (!selectedBookIdsRef.current.length) {
+    if (!selectedBookIdsRef.current.length && !isLookupFilterContext) {
       setIsbnEnrichmentMessage(appText.library.enrichingMissingDataSelectBooks);
       return;
     }
 
-    const booksMissingData = selectedBooksMissingRemoteData;
+    const booksMissingData = isSelectionMode
+      ? selectedBooksMissingRemoteData
+      : quickFilteredLookupBooks;
 
     if (!booksMissingData.length) {
       setIsbnEnrichmentMessage(appText.library.enrichingMissingDataNothingToDo);
@@ -853,46 +878,50 @@ export function LibraryScreen({ onStartScan }: LibraryScreenProps) {
             </Text>
           </View>
 
-          {isSelectionMode ? (
+          {isSelectionMode || isLookupFilterContext ? (
             <View style={styles.batchPanel}>
-              <Text style={styles.batchCount}>
-                {appText.library.batchSelectedLabel(selectedBookIds.length)}
-              </Text>
+              {isSelectionMode ? (
+                <Text style={styles.batchCount}>
+                  {appText.library.batchSelectedLabel(selectedBookIds.length)}
+                </Text>
+              ) : null}
               {batchActionMessage ? (
                 <View style={styles.batchMessage}>
                   <Text style={styles.batchMessageLabel}>{batchActionMessage}</Text>
                 </View>
               ) : null}
-              <View style={styles.batchShortcuts}>
-                <Pressable
-                  onPress={selectAllVisibleBooks}
-                  style={({ pressed }) => [
-                    styles.batchShortcutChip,
-                    pressed ? styles.batchChipPressed : null,
-                    isApplyingBatch ? styles.batchChipDisabled : null
-                  ]}
-                  disabled={isApplyingBatch}
-                >
-                  <Text style={styles.batchShortcutLabel}>
-                    {appText.library.selectAllVisible}
-                  </Text>
-                </Pressable>
-                <Pressable
-                  onPress={clearSelection}
-                  style={({ pressed }) => [
-                    styles.batchClearChip,
-                    pressed ? styles.batchChipPressed : null,
-                    isApplyingBatch ? styles.batchChipDisabled : null
-                  ]}
-                  disabled={isApplyingBatch}
-                >
-                  <Text style={styles.batchClearLabel}>
-                    {appText.library.clearSelection}
-                  </Text>
-                </Pressable>
-              </View>
+              {isSelectionMode ? (
+                <View style={styles.batchShortcuts}>
+                  <Pressable
+                    onPress={selectAllVisibleBooks}
+                    style={({ pressed }) => [
+                      styles.batchShortcutChip,
+                      pressed ? styles.batchChipPressed : null,
+                      isApplyingBatch ? styles.batchChipDisabled : null
+                    ]}
+                    disabled={isApplyingBatch}
+                  >
+                    <Text style={styles.batchShortcutLabel}>
+                      {appText.library.selectAllVisible}
+                    </Text>
+                  </Pressable>
+                  <Pressable
+                    onPress={clearSelection}
+                    style={({ pressed }) => [
+                      styles.batchClearChip,
+                      pressed ? styles.batchChipPressed : null,
+                      isApplyingBatch ? styles.batchChipDisabled : null
+                    ]}
+                    disabled={isApplyingBatch}
+                  >
+                    <Text style={styles.batchClearLabel}>
+                      {appText.library.clearSelection}
+                    </Text>
+                  </Pressable>
+                </View>
+              ) : null}
 
-              {isLookupSelectionContext ? (
+              {isLookupSelectionContext || isLookupFilterContext ? (
                 <View style={styles.batchBlock}>
                   <View style={styles.lookupToggleRow}>
                     <Pressable
