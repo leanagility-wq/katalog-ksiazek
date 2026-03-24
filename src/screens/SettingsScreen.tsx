@@ -18,16 +18,19 @@ export function SettingsScreen() {
   const {
     openAIApiKey,
     savedLocations,
+    savedGenres,
     isLoaded,
     isSaving,
     errorMessage,
     loadSettings,
     saveOpenAIApiKey,
     clearOpenAIApiKey,
-    saveSavedLocations
+    saveSavedLocations,
+    saveSavedGenres
   } = useSettingsStore();
   const [draftApiKey, setDraftApiKey] = useState("");
   const [draftLocation, setDraftLocation] = useState("");
+  const [draftGenre, setDraftGenre] = useState("");
   const [infoMessage, setInfoMessage] = useState<string | null>(null);
 
   useEffect(() => {
@@ -66,6 +69,23 @@ export function SettingsScreen() {
   const handleRemoveLocation = async (location: string) => {
     await saveSavedLocations(savedLocations.filter((item) => item !== location));
     setInfoMessage(appText.settings.locationsSavedInfo);
+  };
+
+  const handleAddGenre = async () => {
+    const nextGenre = draftGenre.trim();
+
+    if (!nextGenre) {
+      return;
+    }
+
+    await saveSavedGenres([...savedGenres, nextGenre]);
+    setDraftGenre("");
+    setInfoMessage(appText.settings.genresSavedInfo);
+  };
+
+  const handleRemoveGenre = async (genre: string) => {
+    await saveSavedGenres(savedGenres.filter((item) => item !== genre));
+    setInfoMessage(appText.settings.genresSavedInfo);
   };
 
   return (
@@ -162,6 +182,56 @@ export function SettingsScreen() {
               ))
             ) : (
               <Text style={styles.helper}>{appText.settings.locationsEmpty}</Text>
+            )}
+          </View>
+        </SectionCard>
+
+        <SectionCard
+          title={appText.settings.genresTitle}
+          subtitle={appText.settings.genresSubtitle}
+        >
+          <View style={styles.field}>
+            <Text style={styles.label}>{appText.settings.genresLabel}</Text>
+            <TextInput
+              value={draftGenre}
+              onChangeText={setDraftGenre}
+              style={styles.input}
+              placeholder={appText.settings.genresPlaceholder}
+              placeholderTextColor="#9a8a76"
+              returnKeyType="done"
+              onSubmitEditing={() => {
+                void handleAddGenre();
+              }}
+            />
+          </View>
+
+          <PrimaryButton
+            label={
+              isSaving
+                ? appText.settings.savingButton
+                : appText.settings.saveGenresButton
+            }
+            onPress={() => void handleAddGenre()}
+            disabled={isSaving || draftGenre.trim().length === 0}
+          />
+
+          <View style={styles.savedLocations}>
+            {savedGenres.length ? (
+              savedGenres.map((genre) => (
+                <View key={genre} style={styles.locationRow}>
+                  <Text style={styles.locationLabel}>{genre}</Text>
+                  <View style={styles.locationAction}>
+                    <PrimaryButton
+                      label={appText.settings.removeLocationButton}
+                      onPress={() => void handleRemoveGenre(genre)}
+                      disabled={isSaving}
+                      compact
+                    />
+                  </View>
+                </View>
+              ))
+            ) : (
+              <Text style={styles.helper}>{appText.settings.genresEmpty}</Text>
             )}
           </View>
         </SectionCard>

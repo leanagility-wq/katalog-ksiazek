@@ -91,9 +91,9 @@ export function BookListItem({
                   {book.shelfLocation || "Dodaj lokalizację"}
                 </Text>
               </Pressable>
-              {book.isbn ? (
+              {book.genre ? (
                 <Text numberOfLines={1} style={styles.metaPill}>
-                  <Text style={styles.metaPillText}>ISBN {book.isbn}</Text>
+                  <Text style={styles.metaPillText}>{book.genre}</Text>
                 </Text>
               ) : null}
             </View>

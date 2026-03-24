@@ -3,14 +3,17 @@ import { create } from "zustand";
 import {
   clearStoredOpenAIApiKey,
   getStoredOpenAIApiKey,
+  getStoredSavedGenres,
   getStoredSavedLocations,
   setStoredOpenAIApiKey,
+  setStoredSavedGenres,
   setStoredSavedLocations
 } from "@/storage/secureStore";
 
 interface SettingsState {
   openAIApiKey: string;
   savedLocations: string[];
+  savedGenres: string[];
   isLoaded: boolean;
   isSaving: boolean;
   errorMessage: string | null;
@@ -18,12 +21,13 @@ interface SettingsState {
   saveOpenAIApiKey: (apiKey: string) => Promise<void>;
   clearOpenAIApiKey: () => Promise<void>;
   saveSavedLocations: (locations: string[]) => Promise<void>;
+  saveSavedGenres: (genres: string[]) => Promise<void>;
 }
 
-function normalizeLocations(locations: string[]) {
+function normalizeValues(values: string[]) {
   return Array.from(
     new Set(
-      locations
+      values
         .map((value) => value.trim())
         .filter(Boolean)
     )
@@ -33,19 +37,22 @@ function normalizeLocations(locations: string[]) {
 export const useSettingsStore = create<SettingsState>((set) => ({
   openAIApiKey: "",
   savedLocations: [],
+  savedGenres: [],
   isLoaded: false,
   isSaving: false,
   errorMessage: null,
   loadSettings: async () => {
     try {
-      const [apiKey, savedLocations] = await Promise.all([
+      const [apiKey, savedLocations, savedGenres] = await Promise.all([
         getStoredOpenAIApiKey(),
-        getStoredSavedLocations()
+        getStoredSavedLocations(),
+        getStoredSavedGenres()
       ]);
 
       set({
         openAIApiKey: apiKey ?? "",
-        savedLocations: normalizeLocations(savedLocations),
+        savedLocations: normalizeValues(savedLocations),
+        savedGenres: normalizeValues(savedGenres),
         isLoaded: true,
         errorMessage: null
       });
@@ -100,7 +107,7 @@ export const useSettingsStore = create<SettingsState>((set) => ({
     }
   },
   saveSavedLocations: async (locations) => {
-    const normalizedLocations = normalizeLocations(locations);
+    const normalizedLocations = normalizeValues(locations);
     set({ isSaving: true, errorMessage: null });
 
     try {
@@ -116,6 +123,27 @@ export const useSettingsStore = create<SettingsState>((set) => ({
           error instanceof Error
             ? error.message
             : "Nie udało się zapisać listy lokalizacji."
+      });
+      throw error;
+    }
+  },
+  saveSavedGenres: async (genres) => {
+    const normalizedGenres = normalizeValues(genres);
+    set({ isSaving: true, errorMessage: null });
+
+    try {
+      await setStoredSavedGenres(normalizedGenres);
+      set({
+        savedGenres: normalizedGenres,
+        isSaving: false
+      });
+    } catch (error) {
+      set({
+        isSaving: false,
+        errorMessage:
+          error instanceof Error
+            ? error.message
+            : "Nie udało się zapisać listy gatunków."
       });
       throw error;
     }

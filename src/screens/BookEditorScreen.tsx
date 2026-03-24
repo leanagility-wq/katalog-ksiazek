@@ -129,7 +129,7 @@ export function BookEditorScreen({
     matches: DuplicateMatch[];
   } | null>(null);
   const { saveBook, deleteBook } = useLibraryStore();
-  const { savedLocations } = useSettingsStore();
+  const { savedLocations, savedGenres } = useSettingsStore();
 
   useEffect(() => {
     setDraft(createDraft(book));
@@ -180,19 +180,37 @@ export function BookEditorScreen({
   };
 
   const applySearchResult = (result: RemoteBookMatch) => {
-    setDraft((current) => ({
-      ...current,
-      title: result.title || current.title,
-      author: result.author || current.author,
-      genre: result.genre ?? current.genre,
-      isbn: result.isbn ?? current.isbn
-    }));
+    const nextDraft: BookDraft = {
+      ...draft,
+      title: result.title || draft.title,
+      author: result.author || draft.author,
+      genre: result.genre ?? draft.genre,
+      isbn: result.isbn ?? draft.isbn
+    };
+
+    setDraft(nextDraft);
+    setSearchResults([]);
+
+    if (book) {
+      void persistBook(toBook(nextDraft), undefined, false).catch((error) => {
+        Alert.alert(
+          appText.editor.saveErrorTitle,
+          error instanceof Error ? error.message : appText.editor.retryLabel
+        );
+      });
+    }
   };
 
-  const persistBook = async (candidateBook: Book, resolution?: DuplicateSaveResolution) => {
+  const persistBook = async (
+    candidateBook: Book,
+    resolution?: DuplicateSaveResolution,
+    closeOnSave = true
+  ) => {
     await saveBook(candidateBook, resolution);
     setPendingDuplicate(null);
-    onSaved();
+    if (closeOnSave) {
+      onSaved();
+    }
   };
 
   const handleSave = async () => {
@@ -323,6 +341,19 @@ export function BookEditorScreen({
             onChangeText={(value) => updateDraft("genre", value)}
             placeholder={appText.editor.fields.genrePlaceholder}
           />
+          {savedGenres.length ? (
+            <View style={styles.locationSuggestions}>
+              {savedGenres.map((genre) => (
+                <Pressable
+                  key={genre}
+                  onPress={() => updateDraft("genre", genre)}
+                  style={styles.locationChip}
+                >
+                  <Text style={styles.locationChipLabel}>{genre}</Text>
+                </Pressable>
+              ))}
+            </View>
+          ) : null}
           <View style={styles.inlineActions}>
             <PrimaryButton
               label={
