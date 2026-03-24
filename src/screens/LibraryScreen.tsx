@@ -237,6 +237,12 @@ export function LibraryScreen({ onStartScan }: LibraryScreenProps) {
     );
   };
 
+  const selectBooksWithoutIsbn = () => {
+    replaceSelection(
+      visibleBooks.filter((book) => !book.isbn?.trim()).map((book) => book.id)
+    );
+  };
+
   const selectBooksNeedingReview = () => {
     replaceSelection(
       visibleBooks
@@ -562,11 +568,17 @@ export function LibraryScreen({ onStartScan }: LibraryScreenProps) {
                 {appText.library.visibleWithoutLocationLabel(visibleWithoutLocationCount)}
               </Text>
             </Pressable>
-            <View style={styles.visibleStatChip}>
+            <Pressable
+              onPress={selectBooksWithoutIsbn}
+              style={({ pressed }) => [
+                styles.visibleStatChip,
+                pressed ? styles.visibleStatChipPressed : null
+              ]}
+            >
               <Text style={styles.visibleStatLabel}>
                 {appText.library.visibleWithoutIsbnLabel(visibleWithoutIsbnCount)}
               </Text>
-            </View>
+            </Pressable>
             <View style={styles.visibleStatChip}>
               <Text style={styles.visibleStatLabel}>
                 {appText.library.visibleNeedsReviewLabel(visibleNeedsReviewCount)}
