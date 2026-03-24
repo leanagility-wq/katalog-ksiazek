@@ -55,7 +55,6 @@ export function LibraryScreen({ onStartScan }: LibraryScreenProps) {
   } = useLibraryStore();
   const { savedLocations, savedGenres } = useSettingsStore();
   const [sortKey, setSortKey] = useState<SortKey>("updated_desc");
-  const [queryDraft, setQueryDraft] = useState("");
   const [query, setQuery] = useState("");
   const [genreFilter, setGenreFilter] = useState<string>(ALL_GENRES_FILTER);
   const [locationFilter, setLocationFilter] = useState<string>(ALL_LOCATIONS_FILTER);
@@ -78,6 +77,7 @@ export function LibraryScreen({ onStartScan }: LibraryScreenProps) {
   const [activeQuickFilter, setActiveQuickFilter] =
     useState<QuickCatalogFilter>(null);
   const selectedBookIdsRef = useRef<string[]>([]);
+  const searchDraftRef = useRef("");
 
   const isSelectionMode = selectedBookIds.length > 0;
 
@@ -348,7 +348,7 @@ export function LibraryScreen({ onStartScan }: LibraryScreenProps) {
   };
 
   const handleSubmitSearch = () => {
-    setQuery(queryDraft.trim());
+    setQuery(searchDraftRef.current.trim());
   };
 
   const filterBooksWithoutLocation = () => {
@@ -682,8 +682,10 @@ export function LibraryScreen({ onStartScan }: LibraryScreenProps) {
         <View style={styles.stickyBar}>
           <View style={styles.searchRow}>
             <TextInput
-              value={queryDraft}
-              onChangeText={setQueryDraft}
+              defaultValue={query}
+              onChangeText={(value) => {
+                searchDraftRef.current = value;
+              }}
               onSubmitEditing={handleSubmitSearch}
               placeholder={appText.library.searchPlaceholder}
               placeholderTextColor="#9a8a76"
