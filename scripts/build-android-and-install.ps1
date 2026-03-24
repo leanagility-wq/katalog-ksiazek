@@ -1,6 +1,7 @@
 param(
   [switch]$Release,
-  [switch]$NoMetro
+  [switch]$NoMetro,
+  [switch]$ClearMetroCache
 )
 
 $ErrorActionPreference = "Stop"
@@ -60,7 +61,13 @@ function Ensure-AndroidSdkConfiguration {
 }
 
 function Start-MetroBundler {
-  $metroCommand = "Set-Location `"$ProjectRoot`"; npm.cmd run start"
+  param([switch]$ClearCache)
+
+  $metroCommand = if ($ClearCache) {
+    "Set-Location `"$ProjectRoot`"; npm.cmd run start -- --clear"
+  } else {
+    "Set-Location `"$ProjectRoot`"; npm.cmd run start"
+  }
   Start-Process -FilePath "powershell.exe" -ArgumentList "-NoExit", "-ExecutionPolicy", "Bypass", "-Command", $metroCommand | Out-Null
 }
 
@@ -99,13 +106,23 @@ $apkPath = if ($Release) {
 }
 
 if (-not $Release -and -not $NoMetro) {
-  if (Test-MetroBundlerRunning) {
+  if ($ClearMetroCache -and (Test-MetroBundlerRunning)) {
+    Write-Step "Zatrzymuje uruchomiony Metro przed czystym restartem"
+    Get-NetTCPConnection -LocalPort $MetroPort -State Listen -ErrorAction SilentlyContinue |
+      Select-Object -ExpandProperty OwningProcess -Unique |
+      ForEach-Object {
+        Stop-Process -Id $_ -Force -ErrorAction SilentlyContinue
+      }
+    Start-Sleep -Seconds 2
+  }
+
+  if ((-not $ClearMetroCache) -and (Test-MetroBundlerRunning)) {
     Write-Step "Metro juz dziala na porcie $MetroPort"
   } else {
     Write-Step "Uruchamiam Metro dla debug builda"
-    Start-MetroBundler
+    Start-MetroBundler -ClearCache:$ClearMetroCache
     $startedMetro = $true
-    Start-Sleep -Seconds 4
+    Start-Sleep -Seconds 6
   }
 
   Write-Step "Robie adb reverse dla Metro"
