@@ -235,23 +235,36 @@ export function LibraryScreen({ onStartScan }: LibraryScreenProps) {
     setSelectedBookIds(nextSelection);
   };
 
+  const toggleQuickSelection = (
+    filterKey: QuickSelectionFilter,
+    bookIds: string[]
+  ) => {
+    if (activeQuickSelection === filterKey) {
+      clearSelection();
+      return;
+    }
+
+    setActiveQuickSelection(filterKey);
+    replaceSelection(bookIds);
+  };
+
   const selectBooksWithoutLocation = () => {
-    setActiveQuickSelection("no_location");
-    replaceSelection(
+    toggleQuickSelection(
+      "no_location",
       visibleBooks.filter((book) => !book.shelfLocation?.trim()).map((book) => book.id)
     );
   };
 
   const selectBooksWithoutIsbn = () => {
-    setActiveQuickSelection("no_isbn");
-    replaceSelection(
+    toggleQuickSelection(
+      "no_isbn",
       visibleBooks.filter((book) => !book.isbn?.trim()).map((book) => book.id)
     );
   };
 
   const selectBooksWithoutGenre = () => {
-    setActiveQuickSelection("no_genre");
-    replaceSelection(
+    toggleQuickSelection(
+      "no_genre",
       visibleBooks.filter((book) => !book.genre?.trim()).map((book) => book.id)
     );
   };
