@@ -167,7 +167,11 @@ export const appText = {
     subtitle:
       "Na tym etapie przygotowany jest poprawny format eksportu. Kolejny krok to zapis do pliku na urządzeniu.",
     csvLabel: "CSV",
-    jsonLabel: "JSON"
+    jsonLabel: "JSON",
+    shareCsvButton: "Utwórz i udostępnij CSV",
+    sharingCsvButton: "Tworzę plik CSV...",
+    successMessage: (path: string) => `Plik CSV gotowy: ${path}`,
+    errorTitle: "Nie udało się wyeksportować CSV"
   },
   scan: {
     title: "Skanowanie",
