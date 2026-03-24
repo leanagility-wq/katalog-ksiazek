@@ -36,6 +36,11 @@ export const appText = {
       "Najpierw zaznacz książki, którym chcesz uzupełnić dane z sieci.",
     enrichingMissingDataRateLimited:
       "Google Books chwilowo ograniczyło zapytania. Zapisane wyniki już zostały zachowane.",
+    filtersShowButton: "Pokaż filtry",
+    filtersHideButton: "Ukryj filtry",
+    filtersActiveSummary: (count: number) => `Aktywne filtry: ${count}`,
+    batchShowButton: "Operacje zbiorcze",
+    batchHideButton: "Ukryj operacje",
     genreFilterLabel: "Filtr gatunku",
     genreFilterAll: "Wszystkie gatunki",
     searchPlaceholder: "Szukaj po tytule, autorze, gatunku, ISBN albo lokalizacji",
