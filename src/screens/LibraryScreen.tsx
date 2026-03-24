@@ -97,9 +97,9 @@ export function LibraryScreen({ onStartScan }: LibraryScreenProps) {
 
   const duplicateBookIds = useMemo(() => collectDuplicateBookIds(books), [books]);
   const selectedBookIdSet = useMemo(() => new Set(selectedBookIds), [selectedBookIds]);
-  const booksWithoutIsbn = useMemo(
-    () => books.filter((book) => !book.isbn?.trim()),
-    [books]
+  const selectedBooks = useMemo(
+    () => books.filter((book) => selectedBookIdSet.has(book.id)),
+    [books, selectedBookIdSet]
   );
 
   const visibleBooks = useMemo(() => {
@@ -316,8 +316,17 @@ export function LibraryScreen({ onStartScan }: LibraryScreenProps) {
   };
 
   const handleEnrichMissingIsbn = async () => {
-    if (!booksWithoutIsbn.length) {
-      setIsbnEnrichmentMessage(appText.library.enrichingMissingIsbnNothingToDo);
+    if (!selectedBookIdsRef.current.length) {
+      setIsbnEnrichmentMessage(appText.library.enrichingMissingDataSelectBooks);
+      return;
+    }
+
+    const booksMissingData = selectedBooks.filter(
+      (book) => !book.isbn?.trim() || !book.genre?.trim()
+    );
+
+    if (!booksMissingData.length) {
+      setIsbnEnrichmentMessage(appText.library.enrichingMissingDataNothingToDo);
       return;
     }
 
@@ -327,11 +336,11 @@ export function LibraryScreen({ onStartScan }: LibraryScreenProps) {
     try {
       const updatedBooks: Book[] = [];
 
-      for (const [index, book] of booksWithoutIsbn.entries()) {
+      for (const [index, book] of booksMissingData.entries()) {
         setIsbnEnrichmentMessage(
-          appText.library.enrichingMissingIsbnProgress(
+          appText.library.enrichingMissingDataProgress(
             index + 1,
-            booksWithoutIsbn.length,
+            booksMissingData.length,
             book.title
           )
         );
@@ -354,10 +363,10 @@ export function LibraryScreen({ onStartScan }: LibraryScreenProps) {
 
         updatedBooks.push({
           ...book,
-          title: bestMatch.title || book.title,
-          author: bestMatch.author || book.author,
-          genre: bestMatch.genre ?? book.genre,
-          isbn: bestMatch.isbn,
+          title: book.title || bestMatch.title,
+          author: book.author || bestMatch.author,
+          genre: book.genre?.trim() ? book.genre : bestMatch.genre,
+          isbn: book.isbn?.trim() ? book.isbn : bestMatch.isbn,
           updatedAt: book.updatedAt
         });
       }
@@ -367,9 +376,9 @@ export function LibraryScreen({ onStartScan }: LibraryScreenProps) {
       }
 
       setIsbnEnrichmentMessage(
-        appText.library.enrichingMissingIsbnDone(
+        appText.library.enrichingMissingDataDone(
           updatedBooks.length,
-          booksWithoutIsbn.length
+          booksMissingData.length
         )
       );
     } catch (error) {
@@ -482,13 +491,13 @@ export function LibraryScreen({ onStartScan }: LibraryScreenProps) {
         <PrimaryButton
           label={
             isEnrichingMissingIsbn
-              ? appText.library.enrichingMissingIsbnButton
-              : appText.library.enrichMissingIsbnButton
+              ? appText.library.enrichingMissingDataButton
+              : appText.library.enrichMissingDataButton
           }
           onPress={() => {
             void handleEnrichMissingIsbn();
           }}
-          disabled={isEnrichingMissingIsbn || isLoading}
+          disabled={isEnrichingMissingIsbn || isLoading || !isSelectionMode}
           compact
         />
 

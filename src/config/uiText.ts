@@ -18,13 +18,16 @@ export const appText = {
     countLabel: (count: number) => `Pozycji w katalogu: ${count}`,
     scanButton: "Zeskanuj nową półkę",
     addManualButton: "Dodaj ręcznie",
-    enrichMissingIsbnButton: "Uzupełnij brakujące ISBN z sieci",
-    enrichingMissingIsbnButton: "Uzupełniam dane z sieci...",
-    enrichingMissingIsbnProgress: (current: number, total: number, title: string) =>
+    enrichMissingDataButton: "Uzupełnij brakujące dane z sieci",
+    enrichingMissingDataButton: "Uzupełniam dane z sieci...",
+    enrichingMissingDataProgress: (current: number, total: number, title: string) =>
       `Sprawdzam ${current} z ${total}: ${title}`,
-    enrichingMissingIsbnDone: (updated: number, total: number) =>
-      `Uzupełniono dane dla ${updated} z ${total} książek bez ISBN.`,
-    enrichingMissingIsbnNothingToDo: "Wszystkie książki mają już przypisany ISBN.",
+    enrichingMissingDataDone: (updated: number, total: number) =>
+      `Uzupełniono dane dla ${updated} z ${total} zaznaczonych książek.`,
+    enrichingMissingDataNothingToDo:
+      "Zaznaczone książki mają już komplet ISBN i gatunku.",
+    enrichingMissingDataSelectBooks:
+      "Najpierw zaznacz książki, którym chcesz uzupełnić dane z sieci.",
     genreFilterLabel: "Filtr gatunku",
     genreFilterAll: "Wszystkie gatunki",
     searchPlaceholder: "Szukaj po tytule, autorze, gatunku, ISBN albo lokalizacji",
