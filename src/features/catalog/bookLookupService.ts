@@ -35,6 +35,12 @@ interface GoogleBooksSearchResponse {
   items?: GoogleBooksItem[];
 }
 
+interface MatchContext {
+  title?: string;
+  author?: string;
+  genre?: string;
+}
+
 const GOOGLE_BOOKS_BASE_URL = "https://www.googleapis.com/books/v1/volumes";
 const GENRE_TRANSLATIONS: Record<string, string> = {
   fiction: "Proza",
@@ -82,6 +88,25 @@ const GENRE_TRANSLATIONS: Record<string, string> = {
 
 function normalizeIsbn(value?: string) {
   return (value ?? "").replace(/[^0-9Xx]/g, "").toUpperCase();
+}
+
+function normalizeSearchText(value?: string) {
+  return (value ?? "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9\s]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function toTokenSet(value?: string) {
+  return new Set(
+    normalizeSearchText(value)
+      .split(" ")
+      .map((token) => token.trim())
+      .filter((token) => token.length >= 2)
+  );
 }
 
 function parsePublishYear(value?: string) {
@@ -217,6 +242,50 @@ function mapGoogleBooksItems(items?: GoogleBooksItem[]) {
       };
     })
     .filter((item) => item.title && item.author);
+}
+
+function scoreTokenOverlap(left?: string, right?: string) {
+  const leftTokens = toTokenSet(left);
+  const rightTokens = toTokenSet(right);
+
+  if (!leftTokens.size || !rightTokens.size) {
+    return 0;
+  }
+
+  let overlap = 0;
+
+  leftTokens.forEach((token) => {
+    if (rightTokens.has(token)) {
+      overlap += 1;
+    }
+  });
+
+  return overlap / Math.max(leftTokens.size, rightTokens.size);
+}
+
+export function pickBestRemoteBookMatch(
+  matches: RemoteBookMatch[],
+  context: MatchContext
+) {
+  if (!matches.length) {
+    return null;
+  }
+
+  const scoredMatches = matches.map((match) => {
+    const titleScore = scoreTokenOverlap(match.title, context.title);
+    const authorScore = scoreTokenOverlap(match.author, context.author);
+    const genreScore = scoreTokenOverlap(match.genre, context.genre);
+    const isbnBoost = match.isbn ? 0.25 : 0;
+
+    return {
+      match,
+      score: titleScore * 0.55 + authorScore * 0.3 + genreScore * 0.1 + isbnBoost
+    };
+  });
+
+  scoredMatches.sort((left, right) => right.score - left.score);
+
+  return scoredMatches[0]?.match ?? null;
 }
 
 export async function searchBooksOnline(

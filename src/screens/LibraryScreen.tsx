@@ -14,6 +14,10 @@ import { appText } from "@/config/uiText";
 import { BookListItem } from "@/components/BookListItem";
 import { PrimaryButton } from "@/components/PrimaryButton";
 import { SectionCard } from "@/components/SectionCard";
+import {
+  pickBestRemoteBookMatch,
+  searchBooksOnline
+} from "@/features/catalog/bookLookupService";
 import { collectDuplicateBookIds } from "@/features/catalog/duplicateDetection";
 import { BookEditorScreen } from "@/screens/BookEditorScreen";
 import { useLibraryStore } from "@/store/useLibraryStore";
@@ -22,17 +26,25 @@ import { Book, BookStatus } from "@/types/book";
 
 type QuickEditMode = "status" | "location" | null;
 const CATALOG_PAGE_SIZE = 40;
+const ALL_GENRES_FILTER = "__all__";
 
 interface LibraryScreenProps {
   onStartScan: () => void;
 }
 
 export function LibraryScreen({ onStartScan }: LibraryScreenProps) {
-  const { books, isLoading, errorMessage, saveBook, applyBatchUpdate } =
-    useLibraryStore();
-  const { savedLocations } = useSettingsStore();
+  const {
+    books,
+    isLoading,
+    errorMessage,
+    saveBook,
+    saveBooksBulk,
+    applyBatchUpdate
+  } = useLibraryStore();
+  const { savedLocations, savedGenres } = useSettingsStore();
   const [sortKey, setSortKey] = useState<SortKey>("updated_desc");
   const [query, setQuery] = useState("");
+  const [genreFilter, setGenreFilter] = useState<string>(ALL_GENRES_FILTER);
   const [selectedBookId, setSelectedBookId] = useState<string | null>(null);
   const [isCreating, setIsCreating] = useState(false);
   const [quickEditBookId, setQuickEditBookId] = useState<string | null>(null);
@@ -42,6 +54,10 @@ export function LibraryScreen({ onStartScan }: LibraryScreenProps) {
   const [batchLocationDraft, setBatchLocationDraft] = useState("");
   const [isApplyingBatch, setIsApplyingBatch] = useState(false);
   const [batchActionMessage, setBatchActionMessage] = useState<string | null>(null);
+  const [isEnrichingMissingIsbn, setIsEnrichingMissingIsbn] = useState(false);
+  const [isbnEnrichmentMessage, setIsbnEnrichmentMessage] = useState<string | null>(
+    null
+  );
   const [renderLimit, setRenderLimit] = useState(CATALOG_PAGE_SIZE);
   const selectedBookIdsRef = useRef<string[]>([]);
 
@@ -64,26 +80,53 @@ export function LibraryScreen({ onStartScan }: LibraryScreenProps) {
     [books, savedLocations]
   );
 
+  const genreOptions = useMemo(
+    () =>
+      [
+        ALL_GENRES_FILTER,
+        ...Array.from(
+          new Set(
+            [...savedGenres, ...books.map((book) => book.genre ?? "")]
+              .map((value) => value.trim())
+              .filter(Boolean)
+          )
+        ).sort((left, right) => left.localeCompare(right, "pl"))
+      ],
+    [books, savedGenres]
+  );
+
   const duplicateBookIds = useMemo(() => collectDuplicateBookIds(books), [books]);
   const selectedBookIdSet = useMemo(() => new Set(selectedBookIds), [selectedBookIds]);
+  const booksWithoutIsbn = useMemo(
+    () => books.filter((book) => !book.isbn?.trim()),
+    [books]
+  );
 
   const visibleBooks = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
+    const matchesGenreFilter = (book: Book) =>
+      genreFilter === ALL_GENRES_FILTER || book.genre?.trim() === genreFilter;
 
-    const filteredBooks = normalizedQuery
-      ? books.filter((book) =>
-          [
-            book.title,
-            book.author,
-            book.genre,
-            book.isbn,
-            book.shelfLocation,
-            book.notes
-          ]
-            .filter(Boolean)
-            .some((value) => value?.toLowerCase().includes(normalizedQuery))
-        )
-      : books;
+    const filteredBooks = books.filter((book) => {
+      if (!matchesGenreFilter(book)) {
+        return false;
+      }
+
+      if (!normalizedQuery) {
+        return true;
+      }
+
+      return [
+        book.title,
+        book.author,
+        book.genre,
+        book.isbn,
+        book.shelfLocation,
+        book.notes
+      ]
+        .filter(Boolean)
+        .some((value) => value?.toLowerCase().includes(normalizedQuery));
+    });
 
     const sortedBooks = [...filteredBooks];
 
@@ -105,10 +148,15 @@ export function LibraryScreen({ onStartScan }: LibraryScreenProps) {
     });
 
     return sortedBooks;
-  }, [books, query, sortKey]);
+  }, [books, genreFilter, query, sortKey]);
 
   const visibleWithoutLocationCount = useMemo(
     () => visibleBooks.filter((book) => !book.shelfLocation?.trim()).length,
+    [visibleBooks]
+  );
+
+  const visibleWithoutIsbnCount = useMemo(
+    () => visibleBooks.filter((book) => !book.isbn?.trim()).length,
     [visibleBooks]
   );
 
@@ -126,7 +174,7 @@ export function LibraryScreen({ onStartScan }: LibraryScreenProps) {
 
   useEffect(() => {
     setRenderLimit(CATALOG_PAGE_SIZE);
-  }, [query, sortKey, books.length]);
+  }, [genreFilter, query, sortKey, books.length]);
 
   const closeEditor = () => {
     setSelectedBookId(null);
@@ -250,6 +298,72 @@ export function LibraryScreen({ onStartScan }: LibraryScreenProps) {
     }
   };
 
+  const handleEnrichMissingIsbn = async () => {
+    if (!booksWithoutIsbn.length) {
+      setIsbnEnrichmentMessage(appText.library.enrichingMissingIsbnNothingToDo);
+      return;
+    }
+
+    setIsEnrichingMissingIsbn(true);
+    setBatchActionMessage(null);
+
+    try {
+      const updatedBooks: Book[] = [];
+
+      for (const [index, book] of booksWithoutIsbn.entries()) {
+        setIsbnEnrichmentMessage(
+          appText.library.enrichingMissingIsbnProgress(
+            index + 1,
+            booksWithoutIsbn.length,
+            book.title
+          )
+        );
+
+        const results = await searchBooksOnline(
+          book.title,
+          book.author,
+          undefined,
+          book.genre
+        );
+        const bestMatch = pickBestRemoteBookMatch(results, {
+          title: book.title,
+          author: book.author,
+          genre: book.genre
+        });
+
+        if (!bestMatch?.isbn) {
+          continue;
+        }
+
+        updatedBooks.push({
+          ...book,
+          title: bestMatch.title || book.title,
+          author: bestMatch.author || book.author,
+          genre: bestMatch.genre ?? book.genre,
+          isbn: bestMatch.isbn,
+          updatedAt: book.updatedAt
+        });
+      }
+
+      if (updatedBooks.length) {
+        await saveBooksBulk(updatedBooks);
+      }
+
+      setIsbnEnrichmentMessage(
+        appText.library.enrichingMissingIsbnDone(
+          updatedBooks.length,
+          booksWithoutIsbn.length
+        )
+      );
+    } catch (error) {
+      setIsbnEnrichmentMessage(
+        error instanceof Error ? error.message : errorMessage
+      );
+    } finally {
+      setIsEnrichingMissingIsbn(false);
+    }
+  };
+
   const handleBatchStatusApply = async (status: BookStatus) => {
     const statusLabel =
       STATUS_OPTIONS.find((option) => option.key === status)?.label ?? status;
@@ -348,8 +462,23 @@ export function LibraryScreen({ onStartScan }: LibraryScreenProps) {
             />
           </View>
         </View>
+        <PrimaryButton
+          label={
+            isEnrichingMissingIsbn
+              ? appText.library.enrichingMissingIsbnButton
+              : appText.library.enrichMissingIsbnButton
+          }
+          onPress={() => {
+            void handleEnrichMissingIsbn();
+          }}
+          disabled={isEnrichingMissingIsbn || isLoading}
+          compact
+        />
 
         {errorMessage ? <Text style={styles.error}>{errorMessage}</Text> : null}
+        {isbnEnrichmentMessage ? (
+          <Text style={styles.selectionHint}>{isbnEnrichmentMessage}</Text>
+        ) : null}
         {!isSelectionMode ? (
           <Text style={styles.selectionHint}>{appText.library.batchModeHint}</Text>
         ) : null}
@@ -388,6 +517,39 @@ export function LibraryScreen({ onStartScan }: LibraryScreenProps) {
             })}
           </View>
 
+          <View style={styles.genreFilterBlock}>
+            <Text style={styles.genreFilterLabel}>{appText.library.genreFilterLabel}</Text>
+            <View style={styles.genreFilterRow}>
+              {genreOptions.map((option) => {
+                const isAllOption = option === ALL_GENRES_FILTER;
+                const label = isAllOption
+                  ? appText.library.genreFilterAll
+                  : option;
+                const isActive = genreFilter === option;
+
+                return (
+                  <Pressable
+                    key={option}
+                    onPress={() => setGenreFilter(option)}
+                    style={[
+                      styles.genreChip,
+                      isActive ? styles.genreChipActive : null
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.genreChipLabel,
+                        isActive ? styles.genreChipLabelActive : null
+                      ]}
+                    >
+                      {label}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+          </View>
+
           <View style={styles.visibleStatsRow}>
             <Pressable
               onPress={selectBooksWithoutLocation}
@@ -400,6 +562,11 @@ export function LibraryScreen({ onStartScan }: LibraryScreenProps) {
                 {appText.library.visibleWithoutLocationLabel(visibleWithoutLocationCount)}
               </Text>
             </Pressable>
+            <View style={styles.visibleStatChip}>
+              <Text style={styles.visibleStatLabel}>
+                {appText.library.visibleWithoutIsbnLabel(visibleWithoutIsbnCount)}
+              </Text>
+            </View>
             <View style={styles.visibleStatChip}>
               <Text style={styles.visibleStatLabel}>
                 {appText.library.visibleNeedsReviewLabel(visibleNeedsReviewCount)}
@@ -624,6 +791,39 @@ const styles = StyleSheet.create({
   },
   controlsWrap: {
     paddingBottom: 2
+  },
+  genreFilterBlock: {
+    gap: 6
+  },
+  genreFilterLabel: {
+    color: "#4c3926",
+    fontSize: 12,
+    fontWeight: "800"
+  },
+  genreFilterRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 6
+  },
+  genreChip: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: "#ddd1bc",
+    backgroundColor: "#f6efe4"
+  },
+  genreChipActive: {
+    backgroundColor: "#704d2e",
+    borderColor: "#704d2e"
+  },
+  genreChipLabel: {
+    color: "#6d5636",
+    fontSize: 12,
+    fontWeight: "700"
+  },
+  genreChipLabelActive: {
+    color: "#fff8ee"
   },
   stickyBar: {
     gap: 8,
