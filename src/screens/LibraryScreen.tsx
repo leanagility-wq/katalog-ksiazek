@@ -158,6 +158,10 @@ export function LibraryScreen({ onStartScan }: LibraryScreenProps) {
       (activeQuickFilter === "no_isbn" || activeQuickFilter === "no_genre"),
     [activeQuickFilter, isSelectionMode]
   );
+  const isLocationFilterContext = useMemo(
+    () => !isSelectionMode && activeQuickFilter === "no_location",
+    [activeQuickFilter, isSelectionMode]
+  );
   const isLocationSelectionContext = useMemo(
     () =>
       selectedBooks.length > 0 &&
@@ -432,9 +436,13 @@ export function LibraryScreen({ onStartScan }: LibraryScreenProps) {
     changes: Partial<Pick<Book, "status" | "shelfLocation">>,
     actionMessage: string
   ) => {
-    const selectedIds = [...selectedBookIdsRef.current];
+    const targetIds = isSelectionMode
+      ? [...selectedBookIdsRef.current]
+      : isLocationFilterContext
+        ? visibleBooks.map((book) => book.id)
+        : [];
 
-    if (!selectedIds.length) {
+    if (!targetIds.length) {
       return;
     }
 
@@ -442,8 +450,11 @@ export function LibraryScreen({ onStartScan }: LibraryScreenProps) {
     setBatchActionMessage(actionMessage);
 
     try {
-      await applyBatchUpdate(selectedIds, changes);
-      clearSelection();
+      await applyBatchUpdate(targetIds, changes);
+
+      if (isSelectionMode) {
+        clearSelection();
+      }
     } finally {
       setIsApplyingBatch(false);
       setBatchActionMessage(null);
@@ -888,7 +899,7 @@ export function LibraryScreen({ onStartScan }: LibraryScreenProps) {
             </Text>
           </View>
 
-          {isSelectionMode || isLookupFilterContext ? (
+          {isSelectionMode || isLookupFilterContext || isLocationFilterContext ? (
             <View style={styles.batchPanel}>
               {isSelectionMode ? (
                 <Text style={styles.batchCount}>
@@ -971,7 +982,7 @@ export function LibraryScreen({ onStartScan }: LibraryScreenProps) {
                 </View>
               ) : null}
 
-              {isLocationSelectionContext ? (
+              {isLocationSelectionContext || isLocationFilterContext ? (
                 <View style={styles.batchBlock}>
                   <Text style={styles.batchTitle}>
                     {appText.library.batchLocationTitle}
