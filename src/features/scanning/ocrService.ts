@@ -1,4 +1,10 @@
 import * as FileSystem from "expo-file-system";
+import {
+  SaveFormat,
+  manipulateAsync,
+  type ActionCrop,
+  type ActionResize
+} from "expo-image-manipulator";
 
 import { getStoredOpenAIApiKey } from "@/storage/secureStore";
 import { ScanCandidate } from "@/types/book";
@@ -9,6 +15,9 @@ const OPENAI_API_URL = "https://api.openai.com/v1/responses";
 const HIGH_CONFIDENCE_THRESHOLD = 0.82;
 const MEDIUM_CONFIDENCE_THRESHOLD = 0.6;
 const MAX_RETURNED_BOOKS = 16;
+const PREPROCESS_MAX_DIMENSION = 1600;
+const PREPROCESS_JPEG_QUALITY = 0.86;
+const SEGMENT_OVERLAP_RATIO = 0.08;
 
 interface TextRecognitionFrame {
   left: number;
@@ -54,6 +63,15 @@ interface OpenAIResponsesApiResult {
     }>;
   }>;
 }
+
+interface PreparedImageVariant {
+  uri: string;
+  width: number;
+  height: number;
+  label: string;
+}
+
+const scanSessionCache = new Map<string, Promise<ScanSession>>();
 
 const mockCandidates: ScanCandidate[] = [
   {
@@ -234,14 +252,162 @@ function deduplicateBooks(books: OpenAIBookCandidate[]) {
   });
 }
 
-async function analyzeWithOpenAI(imageUri: string) {
-  const apiKey = await getStoredOpenAIApiKey();
+function buildOpenAiPrompt(label: string) {
+  return [
+    "Na zdjeciu telefonu widac fragment polki z ksiazkami.",
+    "Zwykle bedzie tam 3 do 6 grzbietow, ale jesli ksiazki sa cienkie i wysokie, moze byc ich wiecej.",
+    `Analizujesz teraz obszar: ${label}.`,
+    "Skup sie tylko na ksiazkach, ktorych grzbiety sa faktycznie widoczne w tym obszarze.",
+    "Ignoruj tlo, dlonie i elementy spoza ksiazek.",
+    "Nie zgaduj brakujacych danych.",
+    "Zachowuj polskie znaki, jesli sa widoczne.",
+    "Dla kazdej ksiazki zwroc pola raw_text, title, author, confidence, review_reason.",
+    "raw_text ma zachowac tekst z grzbietu mozliwie wiernie.",
+    "title i author maja byc puste, jesli nie da sie ich odczytac z rozsadna pewnoscia.",
+    "confidence ma byc liczba od 0 do 1.",
+    "review_reason ma krotko wyjasnic, co jest niepewne.",
+    "Odpowiedz wylacznie poprawnym JSON-em w formacie {\"books\":[...]}."
+  ].join(" ");
+}
 
-  if (!apiKey) {
-    throw new Error("Brak klucza OpenAI API. Dodaj go w zakladce Ustawienia.");
+function buildResizeAction(
+  width: number,
+  height: number
+): ActionResize | null {
+  const longestSide = Math.max(width, height);
+
+  if (longestSide <= PREPROCESS_MAX_DIMENSION) {
+    return null;
   }
 
-  const base64Image = await FileSystem.readAsStringAsync(imageUri, {
+  if (width >= height) {
+    return {
+      resize: {
+        width: PREPROCESS_MAX_DIMENSION
+      }
+    };
+  }
+
+  return {
+    resize: {
+      height: PREPROCESS_MAX_DIMENSION
+    }
+  };
+}
+
+async function prepareImageVariants(imageUri: string): Promise<PreparedImageVariant[]> {
+  const imageInfo = await FileSystem.getInfoAsync(imageUri);
+
+  if (!imageInfo.exists) {
+    throw new Error("Nie znaleziono zdjecia do analizy OCR.");
+  }
+
+  const dimensions =
+    "width" in imageInfo && typeof imageInfo.width === "number" &&
+    "height" in imageInfo && typeof imageInfo.height === "number"
+      ? { width: imageInfo.width, height: imageInfo.height }
+      : null;
+
+  if (!dimensions) {
+    return [
+      {
+        uri: imageUri,
+        width: PREPROCESS_MAX_DIMENSION,
+        height: PREPROCESS_MAX_DIMENSION,
+        label: "caly srodkowy kadr"
+      }
+    ];
+  }
+
+  const resizeAction = buildResizeAction(dimensions.width, dimensions.height);
+  const resizedImage = resizeAction
+    ? await manipulateAsync(imageUri, [resizeAction], {
+        compress: PREPROCESS_JPEG_QUALITY,
+        format: SaveFormat.JPEG
+      })
+    : {
+        uri: imageUri,
+        width: dimensions.width,
+        height: dimensions.height
+      };
+
+  const cropInsetX = Math.round(resizedImage.width * 0.04);
+  const cropInsetY = Math.round(resizedImage.height * 0.03);
+  const centeredWidth = Math.max(resizedImage.width - cropInsetX * 2, 320);
+  const centeredHeight = Math.max(resizedImage.height - cropInsetY * 2, 320);
+  const centeredCrop: ActionCrop = {
+    crop: {
+      originX: Math.max(0, cropInsetX),
+      originY: Math.max(0, cropInsetY),
+      width: Math.min(centeredWidth, resizedImage.width),
+      height: Math.min(centeredHeight, resizedImage.height)
+    }
+  };
+
+  const centeredImage = await manipulateAsync(resizedImage.uri, [centeredCrop], {
+    compress: PREPROCESS_JPEG_QUALITY,
+    format: SaveFormat.JPEG
+  });
+
+  const variants: PreparedImageVariant[] = [
+    {
+      uri: centeredImage.uri,
+      width: centeredImage.width,
+      height: centeredImage.height,
+      label: "caly srodkowy kadr"
+    }
+  ];
+
+  if (centeredImage.width >= 900) {
+    const segmentCount = centeredImage.width >= 1300 ? 3 : 2;
+    const baseSegmentWidth = Math.round(centeredImage.width / segmentCount);
+    const overlap = Math.round(centeredImage.width * SEGMENT_OVERLAP_RATIO);
+
+    for (let index = 0; index < segmentCount; index += 1) {
+      const originX =
+        index === 0
+          ? 0
+          : Math.max(0, index * baseSegmentWidth - overlap);
+      const segmentWidth =
+        index === segmentCount - 1
+          ? centeredImage.width - originX
+          : Math.min(centeredImage.width - originX, baseSegmentWidth + overlap * 2);
+
+      const segmentImage = await manipulateAsync(
+        centeredImage.uri,
+        [
+          {
+            crop: {
+              originX,
+              originY: 0,
+              width: segmentWidth,
+              height: centeredImage.height
+            }
+          }
+        ],
+        {
+          compress: PREPROCESS_JPEG_QUALITY,
+          format: SaveFormat.JPEG
+        }
+      );
+
+      variants.push({
+        uri: segmentImage.uri,
+        width: segmentImage.width,
+        height: segmentImage.height,
+        label: `sekcja ${index + 1} z ${segmentCount}`
+      });
+    }
+  }
+
+  return variants;
+}
+
+async function analyzeImageVariantWithOpenAI(
+  variant: PreparedImageVariant,
+  apiKey: string
+) {
+  const base64Image = await FileSystem.readAsStringAsync(variant.uri, {
     encoding: FileSystem.EncodingType.Base64
   });
 
@@ -260,8 +426,7 @@ async function analyzeWithOpenAI(imageUri: string) {
           content: [
             {
               type: "input_text",
-              text:
-                "Na zdjeciu telefonu widac fragment polki z ksiazkami. Zwykle bedzie tam 3 do 6 grzbietow, ale jesli ksiazki sa cienkie i wysokie, moze byc ich wiecej. Skup sie na centralnej czesci kadru i ignoruj dalsze tlo. Zwracaj wszystkie ksiazki, ktorych grzbiet jest naprawde widoczny i czytelny, nawet jesli jest ich 8, 10 albo wiecej. Nie zgaduj brakujacych danych. Zachowuj polskie znaki, jesli sa widoczne. Dla kazdej ksiazki zwroc pola raw_text, title, author, confidence, review_reason. raw_text ma zachowac tekst z grzbietu mozliwie wiernie. title i author maja byc puste, jesli nie da sie ich odczytac z rozsadna pewnoscia. confidence ma byc liczba od 0 do 1. review_reason ma krotko wyjasnic, co jest niepewne. Odpowiedz wylacznie poprawnym JSON-em w formacie {\"books\":[...]}.",
+              text: buildOpenAiPrompt(variant.label)
             },
             {
               type: "input_image",
@@ -320,12 +485,27 @@ async function analyzeWithOpenAI(imageUri: string) {
   }
 
   const parsed = extractJsonObject(responseText);
-  const books = deduplicateBooks(parsed.books ?? [])
+  return parsed.books ?? [];
+}
+
+async function analyzeWithOpenAI(imageUri: string) {
+  const apiKey = await getStoredOpenAIApiKey();
+
+  if (!apiKey) {
+    throw new Error("Brak klucza OpenAI API. Dodaj go w zakladce Ustawienia.");
+  }
+
+  const variants = await prepareImageVariants(imageUri);
+  const booksByVariant = await Promise.all(
+    variants.map((variant) => analyzeImageVariantWithOpenAI(variant, apiKey))
+  );
+  const books = deduplicateBooks(booksByVariant.flat())
     .filter(
       (book) =>
         normalizeWhitespace(book.raw_text).length > 1 ||
         normalizeWhitespace(book.title).length > 1
     )
+    .sort((left, right) => right.confidence - left.confidence)
     .slice(0, MAX_RETURNED_BOOKS);
 
   if (books.length === 0) {
@@ -359,19 +539,36 @@ async function analyzeLocally(imageUri: string) {
 }
 
 export async function scanShelfImage(imageUri: string): Promise<ScanSession> {
-  const apiKey = await getStoredOpenAIApiKey();
+  const cachedSession = scanSessionCache.get(imageUri);
 
-  try {
-    return await analyzeWithOpenAI(imageUri);
-  } catch (error) {
-    if (apiKey) {
-      throw error;
-    }
+  if (cachedSession) {
+    return cachedSession;
+  }
+
+  const scanPromise = (async () => {
+    const apiKey = await getStoredOpenAIApiKey();
 
     try {
-      return await analyzeLocally(imageUri);
-    } catch {
-      return buildMockSession(imageUri, "fallback OCR");
+      return await analyzeWithOpenAI(imageUri);
+    } catch (error) {
+      if (apiKey) {
+        throw error;
+      }
+
+      try {
+        return await analyzeLocally(imageUri);
+      } catch {
+        return buildMockSession(imageUri, "fallback OCR");
+      }
     }
+  })();
+
+  scanSessionCache.set(imageUri, scanPromise);
+
+  try {
+    return await scanPromise;
+  } catch (error) {
+    scanSessionCache.delete(imageUri);
+    throw error;
   }
 }

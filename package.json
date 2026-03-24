@@ -19,6 +19,7 @@
     "expo-camera": "~17.0.0",
     "expo-document-picker": "~13.0.3",
     "expo-file-system": "~18.0.0",
+    "expo-image-manipulator": "~13.0.6",
     "expo-secure-store": "~15.0.7",
     "expo-sharing": "~14.0.8",
     "expo-sqlite": "~15.0.0",
