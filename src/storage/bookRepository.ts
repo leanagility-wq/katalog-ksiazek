@@ -1,8 +1,19 @@
 import { Book } from "@/types/book";
 import { normalizeTitleForDuplicate } from "@/features/catalog/duplicateDetection";
+import { SortKey } from "@/config/bookUi";
 import { getDatabase } from "@/storage/database";
 import { normalizeStoredText } from "@/utils/text";
 import { toSqlValue } from "@/utils/sql";
+
+export interface CatalogFilterQuery {
+  query?: string;
+  genre?: string;
+  location?: string;
+  quickFilter?: "no_location" | "no_isbn" | "no_genre" | null;
+  sortKey: SortKey;
+  offset: number;
+  limit: number;
+}
 
 export interface BookRepository {
   list(): Promise<Book[]>;
@@ -18,6 +29,8 @@ export interface BookRepository {
     locations: string[];
     genres: string[];
   }>;
+  listFilteredPage(query: CatalogFilterQuery): Promise<Book[]>;
+  countFiltered(query: Omit<CatalogFilterQuery, "offset" | "limit">): Promise<number>;
   findByNormalizedTitle(title: string, excludeId?: string): Promise<Book[]>;
   updateQuickFields(
     id: string,
@@ -33,6 +46,64 @@ export interface BookRepository {
 }
 
 class SQLiteBookRepository implements BookRepository {
+  private buildCatalogWhereClause(query: Omit<CatalogFilterQuery, "offset" | "limit" | "sortKey">) {
+    const clauses = ["1 = 1"];
+
+    if (query.genre?.trim()) {
+      clauses.push(`genre = ${toSqlValue(query.genre.trim())}`);
+    }
+
+    if (query.location?.trim()) {
+      clauses.push(`shelfLocation = ${toSqlValue(query.location.trim())}`);
+    }
+
+    switch (query.quickFilter) {
+      case "no_location":
+        clauses.push(`(shelfLocation IS NULL OR TRIM(shelfLocation) = '')`);
+        break;
+      case "no_isbn":
+        clauses.push(`(isbn IS NULL OR TRIM(isbn) = '')`);
+        break;
+      case "no_genre":
+        clauses.push(`(genre IS NULL OR TRIM(genre) = '')`);
+        break;
+      default:
+        break;
+    }
+
+    const normalizedQuery = query.query?.trim().toLowerCase();
+
+    if (normalizedQuery) {
+      const likeValue = `%${normalizedQuery}%`;
+      clauses.push(`
+        LOWER(
+          COALESCE(title, '') || ' ' ||
+          COALESCE(author, '') || ' ' ||
+          COALESCE(genre, '') || ' ' ||
+          COALESCE(isbn, '') || ' ' ||
+          COALESCE(shelfLocation, '') || ' ' ||
+          COALESCE(notes, '')
+        ) LIKE ${toSqlValue(likeValue)}
+      `);
+    }
+
+    return clauses.join("\n        AND ");
+  }
+
+  private buildCatalogOrderBy(sortKey: SortKey) {
+    switch (sortKey) {
+      case "title_asc":
+        return "ORDER BY title COLLATE NOCASE ASC, author COLLATE NOCASE ASC, rowid DESC";
+      case "author_asc":
+        return "ORDER BY author COLLATE NOCASE ASC, title COLLATE NOCASE ASC, rowid DESC";
+      case "status_asc":
+        return "ORDER BY status COLLATE NOCASE ASC, title COLLATE NOCASE ASC, rowid DESC";
+      case "updated_desc":
+      default:
+        return "ORDER BY updatedAt DESC, rowid DESC";
+    }
+  }
+
   private sortUniqueValues(values: Array<string | null | undefined>) {
     return Array.from(
       new Set(
@@ -204,6 +275,32 @@ class SQLiteBookRepository implements BookRepository {
       locations: this.sortUniqueValues(locations.map((entry) => entry.value)),
       genres: this.sortUniqueValues(genres.map((entry) => entry.value))
     };
+  }
+
+  async listFilteredPage(query: CatalogFilterQuery) {
+    const db = await getDatabase();
+    const whereClause = this.buildCatalogWhereClause(query);
+    const orderBy = this.buildCatalogOrderBy(query.sortKey);
+
+    return db.getAllAsync<Book>(`
+      ${this.baseSelect}
+      WHERE ${whereClause}
+      ${orderBy}
+      LIMIT ${toSqlValue(query.limit)}
+      OFFSET ${toSqlValue(query.offset)}
+    `);
+  }
+
+  async countFiltered(query: Omit<CatalogFilterQuery, "offset" | "limit">) {
+    const db = await getDatabase();
+    const whereClause = this.buildCatalogWhereClause(query);
+    const result = await db.getFirstAsync<{ count: number }>(`
+      SELECT COUNT(*) as count
+      FROM books
+      WHERE ${whereClause}
+    `);
+
+    return result?.count ?? 0;
   }
 
   async findByNormalizedTitle(title: string, excludeId?: string) {

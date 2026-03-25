@@ -21,6 +21,7 @@ import {
   pickBestRemoteBookMatch,
   searchBooksOnline
 } from "@/features/catalog/bookLookupService";
+import { bookRepository } from "@/storage/bookRepository";
 import { collectDuplicateBookIds } from "@/features/catalog/duplicateDetection";
 import { normalizeGenreLabel } from "@/features/catalog/genreCatalog";
 import { BookEditorScreen } from "@/screens/BookEditorScreen";
@@ -33,6 +34,7 @@ const ALL_GENRES_FILTER = "__all__";
 const ALL_LOCATIONS_FILTER = "__all_locations__";
 const ENRICHMENT_SAVE_CHUNK_SIZE = 10;
 const ENRICHMENT_REQUEST_DELAY_MS = 250;
+const FILTERED_PAGE_SIZE = 80;
 type QuickCatalogFilter = "no_location" | "no_isbn" | "no_genre" | null;
 
 interface LibraryScreenProps {
@@ -84,16 +86,16 @@ export function LibraryScreen({ onStartScan }: LibraryScreenProps) {
   const [isFiltersOpen, setIsFiltersOpen] = useState(false);
   const [activeQuickFilter, setActiveQuickFilter] =
     useState<QuickCatalogFilter>(null);
+  const [filteredBooks, setFilteredBooks] = useState<Book[]>([]);
+  const [filteredTotalBooks, setFilteredTotalBooks] = useState(0);
+  const [isFilteredLoading, setIsFilteredLoading] = useState(false);
+  const [isFilteredLoadingMore, setIsFilteredLoadingMore] = useState(false);
+  const [filterQueryVersion, setFilterQueryVersion] = useState(0);
   const selectedBookIdsRef = useRef<string[]>([]);
   const searchDraftRef = useRef("");
   const [, startTransition] = useTransition();
 
   const isSelectionMode = selectedBookIds.length > 0;
-
-  const selectedBook = useMemo(
-    () => books.find((book) => book.id === selectedBookId) ?? null,
-    [books, selectedBookId]
-  );
 
   const locationOptions = useMemo(
     () =>
@@ -131,11 +133,28 @@ export function LibraryScreen({ onStartScan }: LibraryScreenProps) {
     [locationOptions]
   );
 
-  const duplicateBookIds = useMemo(() => collectDuplicateBookIds(books), [books]);
+  const usesRepositoryFiltering =
+    Boolean(query) ||
+    genreFilter !== ALL_GENRES_FILTER ||
+    locationFilter !== ALL_LOCATIONS_FILTER ||
+    activeQuickFilter !== null ||
+    sortKey !== "updated_desc";
+
+  const displayedBooks = usesRepositoryFiltering ? filteredBooks : books;
+
+  const selectedBook = useMemo(
+    () => displayedBooks.find((book) => book.id === selectedBookId) ?? null,
+    [displayedBooks, selectedBookId]
+  );
+
+  const duplicateBookIds = useMemo(
+    () => collectDuplicateBookIds(displayedBooks),
+    [displayedBooks]
+  );
   const selectedBookIdSet = useMemo(() => new Set(selectedBookIds), [selectedBookIds]);
   const selectedBooks = useMemo(
-    () => books.filter((book) => selectedBookIdSet.has(book.id)),
-    [books, selectedBookIdSet]
+    () => displayedBooks.filter((book) => selectedBookIdSet.has(book.id)),
+    [displayedBooks, selectedBookIdSet]
   );
   const selectedBooksMissingLocation = useMemo(
     () => selectedBooks.filter((book) => !book.shelfLocation?.trim()),
@@ -178,85 +197,7 @@ export function LibraryScreen({ onStartScan }: LibraryScreenProps) {
     [selectedBooks]
   );
 
-  const indexedBooks = useMemo(
-    () =>
-      books.map((book) => ({
-        book,
-        normalizedGenre: normalizeGenreLabel(book.genre) ?? "",
-        normalizedLocation: book.shelfLocation?.trim() ?? "",
-        searchableText: [
-          book.title,
-          book.author,
-          book.genre,
-          book.isbn,
-          book.shelfLocation,
-          book.notes
-        ]
-          .filter(Boolean)
-          .join(" ")
-          .toLowerCase()
-      })),
-    [books]
-  );
-
-  const visibleBooks = useMemo(() => {
-    const normalizedQuery = query.trim().toLowerCase();
-    const matchesGenreFilter = (normalizedGenre: string) =>
-      genreFilter === ALL_GENRES_FILTER || normalizedGenre === genreFilter;
-    const matchesLocationFilter = (normalizedLocation: string) =>
-      locationFilter === ALL_LOCATIONS_FILTER || normalizedLocation === locationFilter;
-    const matchesQuickFilter = (book: Book) => {
-      switch (activeQuickFilter) {
-        case "no_location":
-          return !book.shelfLocation?.trim();
-        case "no_isbn":
-          return !book.isbn?.trim();
-        case "no_genre":
-          return !book.genre?.trim();
-        default:
-          return true;
-      }
-    };
-
-    const filteredBooks = indexedBooks
-      .filter(({ book, normalizedGenre, normalizedLocation, searchableText }) => {
-      if (
-        !matchesGenreFilter(normalizedGenre) ||
-        !matchesLocationFilter(normalizedLocation) ||
-        !matchesQuickFilter(book)
-      ) {
-        return false;
-      }
-
-      if (!normalizedQuery) {
-        return true;
-      }
-
-        return searchableText.includes(normalizedQuery);
-      })
-      .map(({ book }) => book);
-
-    const sortedBooks = [...filteredBooks];
-
-    sortedBooks.sort((left, right) => {
-      switch (sortKey) {
-        case "title_asc":
-          return left.title.localeCompare(right.title, "pl");
-        case "author_asc":
-          return left.author.localeCompare(right.author, "pl");
-        case "status_asc":
-          return (
-            left.status.localeCompare(right.status, "pl") ||
-            left.title.localeCompare(right.title, "pl")
-          );
-        case "updated_desc":
-        default:
-          return right.updatedAt.localeCompare(left.updatedAt);
-      }
-    });
-
-    return sortedBooks;
-  }, [activeQuickFilter, genreFilter, indexedBooks, locationFilter, query, sortKey]);
+  const visibleBooks = displayedBooks;
 
   const quickFilteredLookupBooks = useMemo(() => {
     if (activeQuickFilter !== "no_isbn" && activeQuickFilter !== "no_genre") {
@@ -275,11 +216,7 @@ export function LibraryScreen({ onStartScan }: LibraryScreenProps) {
     });
   }, [activeQuickFilter, forceRetryLookup, visibleBooks]);
 
-  const hasActiveCatalogFilters =
-    Boolean(query) ||
-    genreFilter !== ALL_GENRES_FILTER ||
-    locationFilter !== ALL_LOCATIONS_FILTER ||
-    activeQuickFilter !== null;
+  const hasActiveCatalogFilters = usesRepositoryFiltering;
 
   const activePanelFilters = useMemo(() => {
     const filters: Array<{
@@ -314,37 +251,65 @@ export function LibraryScreen({ onStartScan }: LibraryScreenProps) {
   }, [genreFilter, locationFilter, startTransition]);
 
   useEffect(() => {
-    if (hasActiveCatalogFilters && hasMoreBooks && !isLoading && !isLoadingMore) {
-      let isCancelled = false;
-      let interactionHandle:
-        | ReturnType<typeof InteractionManager.runAfterInteractions>
-        | null = null;
-      const timeoutHandle = setTimeout(() => {
-        interactionHandle = InteractionManager.runAfterInteractions(() => {
-          if (!isCancelled) {
-            void loadMoreBooks();
-          }
-        });
-      }, 140);
-
-      return () => {
-        isCancelled = true;
-        clearTimeout(timeoutHandle);
-        interactionHandle?.cancel();
-      };
+    if (!usesRepositoryFiltering) {
+      setFilteredBooks([]);
+      setFilteredTotalBooks(0);
+      setIsFilteredLoading(false);
+      setIsFilteredLoadingMore(false);
+      return;
     }
 
-    return undefined;
+    let isCancelled = false;
+    let interactionHandle:
+      | ReturnType<typeof InteractionManager.runAfterInteractions>
+      | null = null;
+
+    setIsFilteredLoading(true);
+
+    interactionHandle = InteractionManager.runAfterInteractions(() => {
+      void (async () => {
+        try {
+          const filterQuery = {
+            query,
+            genre: genreFilter !== ALL_GENRES_FILTER ? genreFilter : undefined,
+            location: locationFilter !== ALL_LOCATIONS_FILTER ? locationFilter : undefined,
+            quickFilter: activeQuickFilter,
+            sortKey
+          };
+
+          const [nextBooks, nextTotalBooks] = await Promise.all([
+            bookRepository.listFilteredPage({
+              ...filterQuery,
+              offset: 0,
+              limit: FILTERED_PAGE_SIZE
+            }),
+            bookRepository.countFiltered(filterQuery)
+          ]);
+
+          if (!isCancelled) {
+            setFilteredBooks(nextBooks);
+            setFilteredTotalBooks(nextTotalBooks);
+          }
+        } finally {
+          if (!isCancelled) {
+            setIsFilteredLoading(false);
+          }
+        }
+      })();
+    });
+
+    return () => {
+      isCancelled = true;
+      interactionHandle?.cancel();
+    };
   }, [
     activeQuickFilter,
+    filterQueryVersion,
     genreFilter,
-    hasActiveCatalogFilters,
-    hasMoreBooks,
-    isLoading,
-    isLoadingMore,
-    loadMoreBooks,
     locationFilter,
-    query
+    query,
+    sortKey,
+    usesRepositoryFiltering
   ]);
 
   useEffect(() => {
@@ -360,6 +325,7 @@ export function LibraryScreen({ onStartScan }: LibraryScreenProps) {
 
   const closeEditor = () => {
     resetTextSearchOnReturn();
+    setFilterQueryVersion((current) => current + 1);
     setSelectedBookId(null);
     setIsCreating(false);
   };
@@ -452,6 +418,9 @@ export function LibraryScreen({ onStartScan }: LibraryScreenProps) {
 
     try {
       await quickUpdateBook(book.id, changes);
+      if (usesRepositoryFiltering) {
+        setFilterQueryVersion((current) => current + 1);
+      }
       closeQuickEdit();
     } finally {
       setUpdatingBookId(null);
@@ -492,6 +461,9 @@ export function LibraryScreen({ onStartScan }: LibraryScreenProps) {
 
             try {
               await deleteBook(book.id);
+              if (usesRepositoryFiltering) {
+                setFilterQueryVersion((current) => current + 1);
+              }
             } finally {
               setUpdatingBookId(null);
               closeQuickEdit();
@@ -524,6 +496,10 @@ export function LibraryScreen({ onStartScan }: LibraryScreenProps) {
 
       if (isSelectionMode) {
         clearSelection();
+      }
+
+      if (usesRepositoryFiltering) {
+        setFilterQueryVersion((current) => current + 1);
       }
     } finally {
       setIsApplyingBatch(false);
@@ -631,6 +607,9 @@ export function LibraryScreen({ onStartScan }: LibraryScreenProps) {
       }
 
       await flushPendingBooks();
+      if (usesRepositoryFiltering) {
+        setFilterQueryVersion((current) => current + 1);
+      }
 
       setIsbnEnrichmentMessage(
         appText.library.enrichingMissingDataDone(
@@ -670,7 +649,34 @@ export function LibraryScreen({ onStartScan }: LibraryScreenProps) {
   };
 
   const handleLoadMoreBooks = () => {
-    if (hasActiveCatalogFilters || !hasMoreBooks || isLoadingMore) {
+    if (usesRepositoryFiltering) {
+      if (isFilteredLoading || isFilteredLoadingMore || filteredBooks.length >= filteredTotalBooks) {
+        return;
+      }
+
+      setIsFilteredLoadingMore(true);
+
+      void (async () => {
+        try {
+          const nextPage = await bookRepository.listFilteredPage({
+            query,
+            genre: genreFilter !== ALL_GENRES_FILTER ? genreFilter : undefined,
+            location: locationFilter !== ALL_LOCATIONS_FILTER ? locationFilter : undefined,
+            quickFilter: activeQuickFilter,
+            sortKey,
+            offset: filteredBooks.length,
+            limit: FILTERED_PAGE_SIZE
+          });
+
+          setFilteredBooks((current) => [...current, ...nextPage]);
+        } finally {
+          setIsFilteredLoadingMore(false);
+        }
+      })();
+      return;
+    }
+
+    if (!hasMoreBooks || isLoadingMore) {
       return;
     }
 
@@ -985,7 +991,7 @@ export function LibraryScreen({ onStartScan }: LibraryScreenProps) {
             <Text style={styles.lazyInfoLabel}>
               {appText.library.lazyLoadedCount(
                 visibleBooks.length,
-                hasActiveCatalogFilters ? visibleBooks.length : totalBooks
+                usesRepositoryFiltering ? filteredTotalBooks : totalBooks
               )}
             </Text>
           </View>
@@ -1143,7 +1149,17 @@ export function LibraryScreen({ onStartScan }: LibraryScreenProps) {
         </View>
       }
       ListFooterComponent={
-        !hasActiveCatalogFilters && (hasMoreBooks || isLoadingMore) ? (
+        usesRepositoryFiltering ? (
+          isFilteredLoadingMore || filteredBooks.length < filteredTotalBooks ? (
+            <View style={styles.footerLoader}>
+              <Text style={styles.footerLoaderLabel}>
+                {isFilteredLoadingMore
+                  ? appText.library.lazyLoadingMore
+                  : appText.library.lazyLoadedCount(filteredBooks.length, filteredTotalBooks)}
+              </Text>
+            </View>
+          ) : null
+        ) : !hasActiveCatalogFilters && (hasMoreBooks || isLoadingMore) ? (
           <View style={styles.footerLoader}>
             <Text style={styles.footerLoaderLabel}>
               {isLoadingMore
