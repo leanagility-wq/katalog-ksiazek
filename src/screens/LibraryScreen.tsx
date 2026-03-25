@@ -508,7 +508,8 @@ export function LibraryScreen({ onStartScan }: LibraryScreenProps) {
             book.title,
             book.author,
             undefined,
-            book.genre
+            book.genre,
+            savedGenres
           );
           const bestMatch = pickBestRemoteBookMatch(results, {
             title: book.title,

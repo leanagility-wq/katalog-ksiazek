@@ -9,7 +9,10 @@ import {
   setStoredSavedGenres,
   setStoredSavedLocations
 } from "@/storage/secureStore";
-import { CORE_GENRES, normalizeGenreLabel } from "@/features/catalog/genreCatalog";
+import {
+  mergeGenreCollections,
+  normalizeGenreValues
+} from "@/features/catalog/genreCatalog";
 
 interface SettingsState {
   openAIApiKey: string;
@@ -23,10 +26,7 @@ interface SettingsState {
   clearOpenAIApiKey: () => Promise<void>;
   saveSavedLocations: (locations: string[]) => Promise<void>;
   saveSavedGenres: (genres: string[]) => Promise<void>;
-}
-
-function isDefined<T>(value: T | undefined): value is T {
-  return value !== undefined;
+  mergeSavedGenres: (genres: string[]) => Promise<void>;
 }
 
 function normalizeValues(values: string[]) {
@@ -39,17 +39,7 @@ function normalizeValues(values: string[]) {
   ).sort((left, right) => left.localeCompare(right, "pl"));
 }
 
-function normalizeGenreValues(values: string[]) {
-  const normalizedGenres = values
-    .map((value) => normalizeGenreLabel(value))
-    .filter(isDefined);
-
-  return Array.from(new Set([...CORE_GENRES, ...normalizedGenres])).sort((left, right) =>
-    left.localeCompare(right, "pl")
-  );
-}
-
-export const useSettingsStore = create<SettingsState>((set) => ({
+export const useSettingsStore = create<SettingsState>((set, get) => ({
   openAIApiKey: "",
   savedLocations: [],
   savedGenres: [],
@@ -150,6 +140,32 @@ export const useSettingsStore = create<SettingsState>((set) => ({
       await setStoredSavedGenres(normalizedGenres);
       set({
         savedGenres: normalizedGenres,
+        isSaving: false
+      });
+    } catch (error) {
+      set({
+        isSaving: false,
+        errorMessage:
+          error instanceof Error
+            ? error.message
+            : "Nie udało się zapisać listy gatunków."
+      });
+      throw error;
+    }
+  },
+  mergeSavedGenres: async (genres) => {
+    const currentGenres = get().isLoaded
+      ? get().savedGenres
+      : await getStoredSavedGenres();
+    const normalizedGenres = mergeGenreCollections(currentGenres, genres);
+
+    set({ isSaving: true, errorMessage: null });
+
+    try {
+      await setStoredSavedGenres(normalizedGenres);
+      set({
+        savedGenres: normalizedGenres,
+        isLoaded: true,
         isSaving: false
       });
     } catch (error) {

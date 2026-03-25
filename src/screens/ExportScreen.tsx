@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Alert, ScrollView, StyleSheet, Text } from "react-native";
 import * as DocumentPicker from "expo-document-picker";
 import * as FileSystem from "expo-file-system";
@@ -11,12 +11,20 @@ import {
   shareCsvExport,
 } from "@/features/export/exportService";
 import { useLibraryStore } from "@/store/useLibraryStore";
+import { useSettingsStore } from "@/store/useSettingsStore";
 
 export function ExportScreen() {
   const { books, saveBooksBulk } = useLibraryStore();
+  const { isLoaded, loadSettings, mergeSavedGenres } = useSettingsStore();
   const [isSharingCsv, setIsSharingCsv] = useState(false);
   const [isImportingCsv, setIsImportingCsv] = useState(false);
   const [lastExportMessage, setLastExportMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!isLoaded) {
+      void loadSettings();
+    }
+  }, [isLoaded, loadSettings]);
 
   const handleShareCsv = async () => {
     setIsSharingCsv(true);
@@ -57,6 +65,11 @@ export function ExportScreen() {
       const importedBooks = importBooksFromCsv(csvText);
 
       await saveBooksBulk(importedBooks);
+      await mergeSavedGenres(
+        importedBooks
+          .map((book) => book.genre)
+          .filter((genre): genre is string => Boolean(genre))
+      );
 
       setLastExportMessage(
         appText.export.importSuccessMessage(importedBooks.length)

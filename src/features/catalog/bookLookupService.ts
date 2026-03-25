@@ -210,7 +210,7 @@ async function fetchGoogleBooks(query: string, langRestrict?: string) {
   throw new RemoteLookupError("Wyszukiwanie online nie powiodło się.");
 }
 
-function mapGoogleBooksItems(items?: GoogleBooksItem[]) {
+function mapGoogleBooksItems(items?: GoogleBooksItem[], availableGenres: string[] = []) {
   return (items ?? [])
     .filter((item) => item.volumeInfo?.title)
     .map<RemoteBookMatch>((item) => {
@@ -224,7 +224,10 @@ function mapGoogleBooksItems(items?: GoogleBooksItem[]) {
           `${volumeInfo.title ?? "unknown"}-${volumeInfo.authors?.[0] ?? "unknown"}`,
         title,
         author: volumeInfo.authors?.join(", ") ?? "",
-        genre: normalizeGenreLabel(volumeInfo.categories?.join(" / ")),
+        genre: normalizeGenreLabel(
+          volumeInfo.categories?.join(" / "),
+          availableGenres
+        ),
         isbn: preferredIsbn,
         publishYear: parsePublishYear(volumeInfo.publishedDate),
         thumbnailUrl:
@@ -282,7 +285,8 @@ export async function searchBooksOnline(
   title: string,
   author: string,
   isbn?: string,
-  genre?: string
+  genre?: string,
+  availableGenres: string[] = []
 ): Promise<RemoteBookMatch[]> {
   const preciseQuery = buildGoogleBooksQuery(title, author, isbn, genre);
   const broadQuery = buildBroadQuery(title, author, genre);
@@ -319,7 +323,9 @@ export async function searchBooksOnline(
 
   for (const plan of searchPlans) {
     const payload = await fetchGoogleBooks(plan.query, plan.langRestrict);
-    const mappedResults = appendUniqueResults(mapGoogleBooksItems(payload.items));
+    const mappedResults = appendUniqueResults(
+      mapGoogleBooksItems(payload.items, availableGenres)
+    );
     collectedResults.push(...mappedResults);
 
     if (collectedResults.length >= 8) {

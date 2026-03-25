@@ -93,7 +93,7 @@ function createDraft(book?: Book | null): BookDraft {
   };
 }
 
-function toBook(draft: BookDraft): Book {
+function toBook(draft: BookDraft, availableGenres: string[]): Book {
   const parsedPrice = draft.price.trim()
     ? Number(draft.price.replace(",", "."))
     : undefined;
@@ -102,7 +102,7 @@ function toBook(draft: BookDraft): Book {
     id: draft.id,
     title: draft.title.trim(),
     author: draft.author.trim(),
-    genre: normalizeGenreLabel(draft.genre),
+    genre: normalizeGenreLabel(draft.genre, availableGenres),
     isbn: draft.isbn.trim() || undefined,
     shelfLocation: draft.shelfLocation.trim() || undefined,
     ocrText: draft.ocrText.trim(),
@@ -131,7 +131,7 @@ export function BookEditorScreen({
     matches: DuplicateMatch[];
   } | null>(null);
   const { saveBook, deleteBook } = useLibraryStore();
-  const { savedLocations, savedGenres } = useSettingsStore();
+  const { savedLocations, savedGenres, mergeSavedGenres } = useSettingsStore();
 
   useEffect(() => {
     setDraft(createDraft(book));
@@ -175,7 +175,8 @@ export function BookEditorScreen({
         draft.title,
         draft.author,
         draft.isbn,
-        draft.genre
+        draft.genre,
+        savedGenres
       );
       setSearchResults(results);
 
@@ -197,7 +198,7 @@ export function BookEditorScreen({
       ...draft,
       title: result.title || draft.title,
       author: result.author || draft.author,
-      genre: normalizeGenreLabel(result.genre ?? draft.genre) ?? "",
+      genre: normalizeGenreLabel(result.genre ?? draft.genre, savedGenres) ?? "",
       isbn: result.isbn ?? draft.isbn
     };
 
@@ -205,7 +206,7 @@ export function BookEditorScreen({
     setSearchResults([]);
 
     if (book) {
-      void persistBook(toBook(nextDraft), undefined, false).catch((error) => {
+      void persistBook(toBook(nextDraft, savedGenres), undefined, false).catch((error) => {
         Alert.alert(
           appText.editor.saveErrorTitle,
           error instanceof Error ? error.message : appText.editor.retryLabel
@@ -219,6 +220,10 @@ export function BookEditorScreen({
     resolution?: DuplicateSaveResolution,
     closeOnSave = true
   ) => {
+    if (candidateBook.genre) {
+      await mergeSavedGenres([candidateBook.genre]);
+    }
+
     await saveBook(candidateBook, resolution);
     setPendingDuplicate(null);
     if (closeOnSave) {
@@ -236,7 +241,7 @@ export function BookEditorScreen({
     }
 
     setIsSaving(true);
-    const candidateBook = toBook(draft);
+    const candidateBook = toBook(draft, savedGenres);
 
     try {
       await persistBook(candidateBook);
