@@ -40,6 +40,8 @@ export const appText = {
     filtersShowButton: "Pokaż filtry",
     filtersHideButton: "Ukryj filtry",
     filtersActiveSummary: (count: number) => `Aktywne filtry: ${count}`,
+    activeGenreFilterLabel: (value: string) => `Gatunek: ${value}`,
+    activeLocationFilterLabel: (value: string) => `Lokalizacja: ${value}`,
     batchShowButton: "Operacje zbiorcze",
     batchHideButton: "Ukryj operacje",
     genreFilterLabel: "Filtr gatunku",

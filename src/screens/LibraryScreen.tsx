@@ -265,6 +265,32 @@ export function LibraryScreen({ onStartScan }: LibraryScreenProps) {
     locationFilter !== ALL_LOCATIONS_FILTER ||
     activeQuickFilter !== null;
 
+  const activePanelFilters = useMemo(() => {
+    const filters: Array<{
+      key: "genre" | "location";
+      label: string;
+      onClear: () => void;
+    }> = [];
+
+    if (genreFilter !== ALL_GENRES_FILTER) {
+      filters.push({
+        key: "genre",
+        label: appText.library.activeGenreFilterLabel(genreFilter),
+        onClear: () => setGenreFilter(ALL_GENRES_FILTER)
+      });
+    }
+
+    if (locationFilter !== ALL_LOCATIONS_FILTER) {
+      filters.push({
+        key: "location",
+        label: appText.library.activeLocationFilterLabel(locationFilter),
+        onClear: () => setLocationFilter(ALL_LOCATIONS_FILTER)
+      });
+    }
+
+    return filters;
+  }, [genreFilter, locationFilter]);
+
   useEffect(() => {
     if (hasActiveCatalogFilters && hasMoreBooks && !isLoading && !isLoadingMore) {
       void loadMoreBooks();
@@ -887,13 +913,31 @@ export function LibraryScreen({ onStartScan }: LibraryScreenProps) {
               </View>
             </View>
           ) : (
-            <Text style={styles.filterSummary}>
-              {appText.library.filtersActiveSummary(
-                (genreFilter !== ALL_GENRES_FILTER ? 1 : 0) +
-                  (locationFilter !== ALL_LOCATIONS_FILTER ? 1 : 0) +
-                  (activeQuickFilter ? 1 : 0)
-              )}
-            </Text>
+            <View style={styles.filtersClosedState}>
+              <Text style={styles.filterSummary}>
+                {appText.library.filtersActiveSummary(
+                  (genreFilter !== ALL_GENRES_FILTER ? 1 : 0) +
+                    (locationFilter !== ALL_LOCATIONS_FILTER ? 1 : 0) +
+                    (activeQuickFilter ? 1 : 0)
+                )}
+              </Text>
+              {activePanelFilters.length ? (
+                <View style={styles.activeFilterRow}>
+                  {activePanelFilters.map((filter) => (
+                    <Pressable
+                      key={filter.key}
+                      onPress={filter.onClear}
+                      style={({ pressed }) => [
+                        styles.activeFilterChip,
+                        pressed ? styles.activeFilterChipPressed : null
+                      ]}
+                    >
+                      <Text style={styles.activeFilterChipLabel}>{filter.label}</Text>
+                    </Pressable>
+                  ))}
+                </View>
+              ) : null}
+            </View>
           )}
 
           <View style={styles.lazyInfoRow}>
@@ -1146,6 +1190,30 @@ const styles = StyleSheet.create({
   filterSummary: {
     color: "#8a7355",
     fontSize: 11,
+    fontWeight: "700"
+  },
+  filtersClosedState: {
+    gap: 6
+  },
+  activeFilterRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 6
+  },
+  activeFilterChip: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: "#dcc7a8",
+    backgroundColor: "#efe3cf"
+  },
+  activeFilterChipPressed: {
+    opacity: 0.84
+  },
+  activeFilterChipLabel: {
+    color: "#6c5232",
+    fontSize: 12,
     fontWeight: "700"
   },
   genreFilterLabel: {
