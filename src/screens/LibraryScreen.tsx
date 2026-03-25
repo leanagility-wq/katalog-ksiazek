@@ -299,7 +299,13 @@ export function LibraryScreen({ onStartScan }: LibraryScreenProps) {
     }
   }, [selectedBookIds.length]);
 
+  const resetTextSearchOnReturn = () => {
+    searchDraftRef.current = "";
+    setQuery("");
+  };
+
   const closeEditor = () => {
+    resetTextSearchOnReturn();
     setSelectedBookId(null);
     setIsCreating(false);
   };
