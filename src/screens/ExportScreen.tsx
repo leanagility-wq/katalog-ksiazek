@@ -14,7 +14,7 @@ import { useLibraryStore } from "@/store/useLibraryStore";
 import { useSettingsStore } from "@/store/useSettingsStore";
 
 export function ExportScreen() {
-  const { books, saveBooksBulk } = useLibraryStore();
+  const { hasMoreBooks, loadAllBooks, saveBooksBulk } = useLibraryStore();
   const { isLoaded, loadSettings, mergeSavedGenres } = useSettingsStore();
   const [isSharingCsv, setIsSharingCsv] = useState(false);
   const [isImportingCsv, setIsImportingCsv] = useState(false);
@@ -31,7 +31,11 @@ export function ExportScreen() {
     setLastExportMessage(null);
 
     try {
-      const fileUri = await shareCsvExport(books);
+      if (hasMoreBooks) {
+        await loadAllBooks();
+      }
+
+      const fileUri = await shareCsvExport(useLibraryStore.getState().books);
       setLastExportMessage(appText.export.successMessage(fileUri));
     } catch (error) {
       Alert.alert(

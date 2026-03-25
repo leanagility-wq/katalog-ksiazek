@@ -28,7 +28,6 @@ import { useSettingsStore } from "@/store/useSettingsStore";
 import { Book } from "@/types/book";
 
 type QuickEditMode = "status" | "location" | "genre" | null;
-const CATALOG_PAGE_SIZE = 40;
 const ALL_GENRES_FILTER = "__all__";
 const ALL_LOCATIONS_FILTER = "__all_locations__";
 const ENRICHMENT_SAVE_CHUNK_SIZE = 10;
@@ -46,8 +45,13 @@ function delay(ms: number) {
 export function LibraryScreen({ onStartScan }: LibraryScreenProps) {
   const {
     books,
+    totalBooks,
+    hasMoreBooks,
     isLoading,
+    isLoadingMore,
     errorMessage,
+    loadMoreBooks,
+    loadAllBooks,
     saveBook,
     saveBooksBulk,
     applyBatchUpdate,
@@ -72,7 +76,6 @@ export function LibraryScreen({ onStartScan }: LibraryScreenProps) {
   const [isbnEnrichmentMessage, setIsbnEnrichmentMessage] = useState<string | null>(
     null
   );
-  const [renderLimit, setRenderLimit] = useState(CATALOG_PAGE_SIZE);
   const [isFiltersOpen, setIsFiltersOpen] = useState(false);
   const [activeQuickFilter, setActiveQuickFilter] =
     useState<QuickCatalogFilter>(null);
@@ -252,11 +255,6 @@ export function LibraryScreen({ onStartScan }: LibraryScreenProps) {
     [visibleBooks]
   );
 
-  const renderedBooks = useMemo(
-    () => visibleBooks.slice(0, renderLimit),
-    [renderLimit, visibleBooks]
-  );
-
   const quickFilteredLookupBooks = useMemo(() => {
     if (activeQuickFilter !== "no_isbn" && activeQuickFilter !== "no_genre") {
       return [];
@@ -274,11 +272,27 @@ export function LibraryScreen({ onStartScan }: LibraryScreenProps) {
     });
   }, [activeQuickFilter, forceRetryLookup, visibleBooks]);
 
-  const canLoadMoreBooks = renderLimit < visibleBooks.length;
+  const hasActiveCatalogFilters =
+    Boolean(query) ||
+    genreFilter !== ALL_GENRES_FILTER ||
+    locationFilter !== ALL_LOCATIONS_FILTER ||
+    activeQuickFilter !== null;
 
   useEffect(() => {
-    setRenderLimit(CATALOG_PAGE_SIZE);
-  }, [activeQuickFilter, genreFilter, locationFilter, query, sortKey, books.length]);
+    if (hasActiveCatalogFilters && hasMoreBooks && !isLoading && !isLoadingMore) {
+      void loadAllBooks();
+    }
+  }, [
+    activeQuickFilter,
+    genreFilter,
+    hasActiveCatalogFilters,
+    hasMoreBooks,
+    isLoading,
+    isLoadingMore,
+    loadAllBooks,
+    locationFilter,
+    query
+  ]);
 
   useEffect(() => {
     if (!selectedBookIds.length) {
@@ -600,13 +614,11 @@ export function LibraryScreen({ onStartScan }: LibraryScreenProps) {
   };
 
   const handleLoadMoreBooks = () => {
-    if (!canLoadMoreBooks) {
+    if (hasActiveCatalogFilters || !hasMoreBooks || isLoadingMore) {
       return;
     }
 
-    setRenderLimit((current) =>
-      Math.min(current + CATALOG_PAGE_SIZE, visibleBooks.length)
-    );
+    void loadMoreBooks();
   };
 
   if (selectedBook || isCreating) {
@@ -660,7 +672,7 @@ export function LibraryScreen({ onStartScan }: LibraryScreenProps) {
         subtitle={
           isLoading
             ? appText.library.loading
-            : appText.library.countLabel(books.length)
+            : appText.library.countLabel(totalBooks)
         }
       >
         <View style={styles.actionsRow}>
@@ -894,8 +906,8 @@ export function LibraryScreen({ onStartScan }: LibraryScreenProps) {
           <View style={styles.lazyInfoRow}>
             <Text style={styles.lazyInfoLabel}>
               {appText.library.lazyLoadedCount(
-                renderedBooks.length,
-                visibleBooks.length
+                visibleBooks.length,
+                hasActiveCatalogFilters ? visibleBooks.length : totalBooks
               )}
             </Text>
           </View>
@@ -1042,7 +1054,7 @@ export function LibraryScreen({ onStartScan }: LibraryScreenProps) {
 
   return (
     <FlatList
-      data={renderedBooks}
+      data={visibleBooks}
       keyExtractor={(item) => item.id}
       renderItem={renderBookItem}
       ListHeaderComponent={renderListHeader}
@@ -1053,10 +1065,12 @@ export function LibraryScreen({ onStartScan }: LibraryScreenProps) {
         </View>
       }
       ListFooterComponent={
-        canLoadMoreBooks ? (
+        !hasActiveCatalogFilters && (hasMoreBooks || isLoadingMore) ? (
           <View style={styles.footerLoader}>
             <Text style={styles.footerLoaderLabel}>
-              {appText.library.lazyLoadingMore}
+              {isLoadingMore
+                ? appText.library.lazyLoadingMore
+                : appText.library.lazyLoadedCount(books.length, totalBooks)}
             </Text>
           </View>
         ) : null

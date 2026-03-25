@@ -5,6 +5,8 @@ import { toSqlValue } from "@/utils/sql";
 
 export interface BookRepository {
   list(): Promise<Book[]>;
+  listPage(offset: number, limit: number): Promise<Book[]>;
+  count(): Promise<number>;
   save(book: Book): Promise<void>;
   saveMany(books: Book[]): Promise<void>;
   updateMany(
@@ -72,31 +74,61 @@ class SQLiteBookRepository implements BookRepository {
     `;
   }
 
+  private readonly baseSelect = `
+    SELECT
+      id,
+      title,
+      author,
+      genre,
+      isbn,
+      remoteLookupStatus,
+      shelfLocation,
+      imageUri,
+      ocrText,
+      price,
+      borrowedTo,
+      notes,
+      status,
+      createdAt,
+      updatedAt
+    FROM books
+  `;
+
+  private readonly baseOrderBy = `
+    ORDER BY updatedAt DESC, rowid DESC
+  `;
+
   async list() {
     const db = await getDatabase();
 
     return db.getAllAsync<Book>(
       `
-        SELECT
-          id,
-          title,
-          author,
-          genre,
-          isbn,
-          remoteLookupStatus,
-          shelfLocation,
-          imageUri,
-          ocrText,
-          price,
-          borrowedTo,
-          notes,
-          status,
-          createdAt,
-          updatedAt
-        FROM books
-        ORDER BY updatedAt DESC, rowid DESC
+        ${this.baseSelect}
+        ${this.baseOrderBy}
       `
     );
+  }
+
+  async listPage(offset: number, limit: number) {
+    const db = await getDatabase();
+
+    return db.getAllAsync<Book>(
+      `
+        ${this.baseSelect}
+        ${this.baseOrderBy}
+        LIMIT ${toSqlValue(limit)}
+        OFFSET ${toSqlValue(offset)}
+      `
+    );
+  }
+
+  async count() {
+    const db = await getDatabase();
+    const result = await db.getFirstAsync<{ count: number }>(
+      "SELECT COUNT(*) as count FROM books"
+    );
+
+    return result?.count ?? 0;
   }
 
   async save(book: Book) {

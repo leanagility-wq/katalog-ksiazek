@@ -8,11 +8,18 @@ import {
 import { bookRepository } from "@/storage/bookRepository";
 import { Book } from "@/types/book";
 
+const LIBRARY_PAGE_SIZE = 80;
+
 interface LibraryState {
   books: Book[];
+  totalBooks: number;
+  hasMoreBooks: boolean;
   isLoading: boolean;
+  isLoadingMore: boolean;
   errorMessage: string | null;
   loadBooks: () => Promise<void>;
+  loadMoreBooks: () => Promise<void>;
+  loadAllBooks: () => Promise<void>;
   saveBook: (book: Book, resolution?: DuplicateSaveResolution) => Promise<void>;
   saveBooksBulk: (books: Book[]) => Promise<void>;
   applyBatchUpdate: (
@@ -51,14 +58,28 @@ function upsertBooksInCollection(books: Book[], nextBooks: Book[]) {
 
 export const useLibraryStore = create<LibraryState>((set, get) => ({
   books: [],
+  totalBooks: 0,
+  hasMoreBooks: false,
   isLoading: false,
+  isLoadingMore: false,
   errorMessage: null,
   loadBooks: async () => {
     set({ isLoading: true, errorMessage: null });
 
     try {
-      const books = await bookRepository.list();
-      set({ books, isLoading: false });
+      const [totalBooks, books] = await Promise.all([
+        bookRepository.count(),
+        bookRepository.listPage(0, LIBRARY_PAGE_SIZE)
+      ]);
+
+      set({
+        books,
+        totalBooks,
+        hasMoreBooks: books.length < totalBooks,
+        isLoading: false,
+        isLoadingMore: false,
+        errorMessage: null
+      });
     } catch (error) {
       const resolvedError = toLibraryError(
         error,
@@ -67,15 +88,61 @@ export const useLibraryStore = create<LibraryState>((set, get) => ({
 
       set({
         isLoading: false,
+        isLoadingMore: false,
         errorMessage: resolvedError.message
       });
 
       throw resolvedError;
     }
   },
+  loadMoreBooks: async () => {
+    const { hasMoreBooks, isLoadingMore, isLoading, books, totalBooks } = get();
+
+    if (!hasMoreBooks || isLoadingMore || isLoading) {
+      return;
+    }
+
+    set({ isLoadingMore: true, errorMessage: null });
+
+    try {
+      const nextPage = await bookRepository.listPage(books.length, LIBRARY_PAGE_SIZE);
+      const nextBooks = upsertBooksInCollection(books, nextPage);
+
+      set({
+        books: nextBooks,
+        hasMoreBooks: nextBooks.length < totalBooks,
+        isLoadingMore: false,
+        errorMessage: null
+      });
+    } catch (error) {
+      const resolvedError = toLibraryError(
+        error,
+        "Nie udało się dociągnąć kolejnych książek."
+      );
+
+      set({
+        isLoadingMore: false,
+        errorMessage: resolvedError.message
+      });
+
+      throw resolvedError;
+    }
+  },
+  loadAllBooks: async () => {
+    while (get().hasMoreBooks && !get().isLoadingMore && !get().isLoading) {
+      await get().loadMoreBooks();
+    }
+
+    while (get().hasMoreBooks && !get().isLoading) {
+      await get().loadMoreBooks();
+    }
+  },
   saveBook: async (book, resolution) => {
     try {
-      const existingBooks = get().books;
+      const loadedBooks = get().books;
+      const existingBooks = get().hasMoreBooks
+        ? await bookRepository.list()
+        : loadedBooks;
       const duplicateMatches = findDuplicateMatches(book, existingBooks, book.id);
       const currentBook = existingBooks.find((item) => item.id === book.id);
 
@@ -104,18 +171,24 @@ export const useLibraryStore = create<LibraryState>((set, get) => ({
           await bookRepository.remove(currentBook.id);
         }
 
-        const nextBooks = existingBooks.filter(
+        const nextLoadedBooks = loadedBooks.filter(
           (item) => item.id !== targetBook.id && item.id !== currentBook?.id
         );
+        const nextBooks = upsertBookInCollection(nextLoadedBooks, overwrittenBook);
 
         set({
-          books: upsertBookInCollection(nextBooks, overwrittenBook),
+          books: nextBooks,
+          hasMoreBooks: nextBooks.length < get().totalBooks,
           errorMessage: null
         });
       } else {
         await bookRepository.save(book);
+        const nextBooks = upsertBookInCollection(loadedBooks, book);
+        const nextTotalBooks = currentBook ? get().totalBooks : get().totalBooks + 1;
         set({
-          books: upsertBookInCollection(existingBooks, book),
+          books: nextBooks,
+          totalBooks: nextTotalBooks,
+          hasMoreBooks: nextBooks.length < nextTotalBooks,
           errorMessage: null
         });
       }
@@ -135,8 +208,13 @@ export const useLibraryStore = create<LibraryState>((set, get) => ({
   saveBooksBulk: async (booksToSave) => {
     try {
       await bookRepository.saveMany(booksToSave);
+      const nextBooks = upsertBooksInCollection(get().books, booksToSave);
+      const nextTotalBooks = await bookRepository.count();
+
       set({
-        books: upsertBooksInCollection(get().books, booksToSave),
+        books: nextBooks,
+        totalBooks: nextTotalBooks,
+        hasMoreBooks: nextBooks.length < nextTotalBooks,
         errorMessage: null
       });
     } catch (error) {
@@ -165,7 +243,11 @@ export const useLibraryStore = create<LibraryState>((set, get) => ({
           : book
       );
 
-      set({ books: nextBooks, errorMessage: null });
+      set({
+        books: nextBooks,
+        hasMoreBooks: nextBooks.length < get().totalBooks,
+        errorMessage: null
+      });
     } catch (error) {
       const resolvedError = toLibraryError(
         error,
@@ -182,8 +264,12 @@ export const useLibraryStore = create<LibraryState>((set, get) => ({
   deleteBook: async (id) => {
     try {
       await bookRepository.remove(id);
+      const nextBooks = get().books.filter((book) => book.id !== id);
+      const nextTotalBooks = Math.max(0, get().totalBooks - 1);
       set({
-        books: get().books.filter((book) => book.id !== id),
+        books: nextBooks,
+        totalBooks: nextTotalBooks,
+        hasMoreBooks: nextBooks.length < nextTotalBooks,
         errorMessage: null
       });
     } catch (error) {
