@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Alert,
   FlatList,
+  InteractionManager,
   ListRenderItemInfo,
   Pressable,
   StyleSheet,
@@ -295,8 +296,26 @@ export function LibraryScreen({ onStartScan }: LibraryScreenProps) {
 
   useEffect(() => {
     if (hasActiveCatalogFilters && hasMoreBooks && !isLoading && !isLoadingMore) {
-      void loadMoreBooks();
+      let isCancelled = false;
+      let interactionHandle:
+        | ReturnType<typeof InteractionManager.runAfterInteractions>
+        | null = null;
+      const timeoutHandle = setTimeout(() => {
+        interactionHandle = InteractionManager.runAfterInteractions(() => {
+          if (!isCancelled) {
+            void loadMoreBooks();
+          }
+        });
+      }, 140);
+
+      return () => {
+        isCancelled = true;
+        clearTimeout(timeoutHandle);
+        interactionHandle?.cancel();
+      };
     }
+
+    return undefined;
   }, [
     activeQuickFilter,
     genreFilter,
