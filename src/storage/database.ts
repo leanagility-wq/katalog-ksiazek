@@ -30,15 +30,6 @@ async function createSchema(db: SQLiteDatabase) {
     );
   `);
 
-  await db.execAsync(`
-    CREATE INDEX IF NOT EXISTS idx_books_updated_at ON books(updatedAt DESC);
-    CREATE INDEX IF NOT EXISTS idx_books_isbn ON books(isbn);
-    CREATE INDEX IF NOT EXISTS idx_books_title_author ON books(title, author);
-    CREATE INDEX IF NOT EXISTS idx_books_normalized_title ON books(normalizedTitle);
-    CREATE INDEX IF NOT EXISTS idx_books_shelf_location ON books(shelfLocation);
-    CREATE INDEX IF NOT EXISTS idx_books_genre ON books(genre);
-  `);
-
   const columns =
     (await db.getAllAsync<{ name: string }>("PRAGMA table_info(books);")) ?? [];
 
@@ -68,6 +59,15 @@ async function createSchema(db: SQLiteDatabase) {
       WHERE id = ${toSqlValue(book.id)};
     `);
   }
+
+  await db.execAsync(`
+    CREATE INDEX IF NOT EXISTS idx_books_updated_at ON books(updatedAt DESC);
+    CREATE INDEX IF NOT EXISTS idx_books_isbn ON books(isbn);
+    CREATE INDEX IF NOT EXISTS idx_books_title_author ON books(title, author);
+    CREATE INDEX IF NOT EXISTS idx_books_normalized_title ON books(normalizedTitle);
+    CREATE INDEX IF NOT EXISTS idx_books_shelf_location ON books(shelfLocation);
+    CREATE INDEX IF NOT EXISTS idx_books_genre ON books(genre);
+  `);
 }
 
 async function seedDatabase(db: SQLiteDatabase) {
