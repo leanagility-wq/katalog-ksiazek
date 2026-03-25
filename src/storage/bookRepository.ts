@@ -1,4 +1,5 @@
 import { Book } from "@/types/book";
+import { normalizeTitleForDuplicate } from "@/features/catalog/duplicateDetection";
 import { getDatabase } from "@/storage/database";
 import { normalizeStoredText } from "@/utils/text";
 import { toSqlValue } from "@/utils/sql";
@@ -7,6 +8,7 @@ export interface BookRepository {
   list(): Promise<Book[]>;
   listPage(offset: number, limit: number): Promise<Book[]>;
   count(): Promise<number>;
+  findByNormalizedTitle(title: string, excludeId?: string): Promise<Book[]>;
   save(book: Book): Promise<void>;
   saveMany(books: Book[]): Promise<void>;
   updateMany(
@@ -36,12 +38,13 @@ class SQLiteBookRepository implements BookRepository {
   private buildSaveStatement(book: Book) {
     return `
       INSERT INTO books (
-        id, title, author, genre, isbn, remoteLookupStatus, shelfLocation, imageUri, ocrText,
+        id, title, normalizedTitle, author, genre, isbn, remoteLookupStatus, shelfLocation, imageUri, ocrText,
         price, borrowedTo, notes, status, createdAt, updatedAt
       )
       VALUES (
         ${toSqlValue(book.id)},
         ${toSqlValue(book.title)},
+        ${toSqlValue(normalizeTitleForDuplicate(book.title))},
         ${toSqlValue(book.author)},
         ${toSqlValue(book.genre)},
         ${toSqlValue(book.isbn)},
@@ -58,6 +61,7 @@ class SQLiteBookRepository implements BookRepository {
       )
       ON CONFLICT(id) DO UPDATE SET
         title = excluded.title,
+        normalizedTitle = excluded.normalizedTitle,
         author = excluded.author,
         genre = excluded.genre,
         isbn = excluded.isbn,
@@ -78,6 +82,7 @@ class SQLiteBookRepository implements BookRepository {
     SELECT
       id,
       title,
+      normalizedTitle,
       author,
       genre,
       isbn,
@@ -129,6 +134,26 @@ class SQLiteBookRepository implements BookRepository {
     );
 
     return result?.count ?? 0;
+  }
+
+  async findByNormalizedTitle(title: string, excludeId?: string) {
+    const db = await getDatabase();
+    const normalizedTitle = normalizeTitleForDuplicate(title);
+
+    if (!normalizedTitle) {
+      return [];
+    }
+
+    const excludeClause = excludeId
+      ? `AND id <> ${toSqlValue(excludeId)}`
+      : "";
+
+    return db.getAllAsync<Book>(`
+      ${this.baseSelect}
+      WHERE normalizedTitle = ${toSqlValue(normalizedTitle)}
+      ${excludeClause}
+      ${this.baseOrderBy}
+    `);
   }
 
   async save(book: Book) {

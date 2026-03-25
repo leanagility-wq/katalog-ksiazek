@@ -1,6 +1,7 @@
 import { SQLiteDatabase, openDatabaseAsync } from "expo-sqlite";
 
 import { mockBooks } from "@/data/mockBooks";
+import { normalizeTitleForDuplicate } from "@/features/catalog/duplicateDetection";
 import { toSqlValue } from "@/utils/sql";
 
 const DATABASE_NAME = "library.db";
@@ -12,6 +13,7 @@ async function createSchema(db: SQLiteDatabase) {
     CREATE TABLE IF NOT EXISTS books (
       id TEXT PRIMARY KEY NOT NULL,
       title TEXT NOT NULL,
+      normalizedTitle TEXT,
       author TEXT NOT NULL,
       genre TEXT,
       isbn TEXT,
@@ -32,6 +34,7 @@ async function createSchema(db: SQLiteDatabase) {
     CREATE INDEX IF NOT EXISTS idx_books_updated_at ON books(updatedAt DESC);
     CREATE INDEX IF NOT EXISTS idx_books_isbn ON books(isbn);
     CREATE INDEX IF NOT EXISTS idx_books_title_author ON books(title, author);
+    CREATE INDEX IF NOT EXISTS idx_books_normalized_title ON books(normalizedTitle);
     CREATE INDEX IF NOT EXISTS idx_books_shelf_location ON books(shelfLocation);
     CREATE INDEX IF NOT EXISTS idx_books_genre ON books(genre);
   `);
@@ -45,6 +48,25 @@ async function createSchema(db: SQLiteDatabase) {
 
   if (!columns.some((column) => column.name === "remoteLookupStatus")) {
     await db.execAsync("ALTER TABLE books ADD COLUMN remoteLookupStatus TEXT;");
+  }
+
+  if (!columns.some((column) => column.name === "normalizedTitle")) {
+    await db.execAsync("ALTER TABLE books ADD COLUMN normalizedTitle TEXT;");
+  }
+
+  const booksMissingNormalizedTitle =
+    (await db.getAllAsync<{ id: string; title: string }>(`
+      SELECT id, title
+      FROM books
+      WHERE normalizedTitle IS NULL OR normalizedTitle = '';
+    `)) ?? [];
+
+  for (const book of booksMissingNormalizedTitle) {
+    await db.execAsync(`
+      UPDATE books
+      SET normalizedTitle = ${toSqlValue(normalizeTitleForDuplicate(book.title))}
+      WHERE id = ${toSqlValue(book.id)};
+    `);
   }
 }
 
@@ -60,12 +82,13 @@ async function seedDatabase(db: SQLiteDatabase) {
   for (const book of mockBooks) {
     await db.execAsync(`
       INSERT INTO books (
-        id, title, author, genre, isbn, remoteLookupStatus, shelfLocation, imageUri, ocrText,
+        id, title, normalizedTitle, author, genre, isbn, remoteLookupStatus, shelfLocation, imageUri, ocrText,
         price, borrowedTo, notes, status, createdAt, updatedAt
       )
       VALUES (
         ${toSqlValue(book.id)},
         ${toSqlValue(book.title)},
+        ${toSqlValue(normalizeTitleForDuplicate(book.title))},
         ${toSqlValue(book.author)},
         ${toSqlValue(book.genre)},
         ${toSqlValue(book.isbn)},

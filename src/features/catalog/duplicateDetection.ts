@@ -1,17 +1,20 @@
 import { Book } from "@/types/book";
 
-export type DuplicateReason = "isbn" | "title_author";
-export type DuplicateSaveMode = "overwrite" | "save_as_copy";
+export type DuplicateReason = "title";
 
 export interface DuplicateMatch {
   book: Book;
   reason: DuplicateReason;
 }
 
-export interface DuplicateSaveResolution {
-  mode: DuplicateSaveMode;
-  targetBookId?: string;
-}
+export type DuplicateSaveResolution =
+  | {
+      mode: "overwrite";
+      targetBookId: string;
+    }
+  | {
+      mode: "save_as_copy";
+    };
 
 export class DuplicateConflictError extends Error {
   matches: DuplicateMatch[];
@@ -19,12 +22,11 @@ export class DuplicateConflictError extends Error {
   constructor(matches: DuplicateMatch[]) {
     super(getDuplicateErrorMessage(matches));
     this.name = "DuplicateConflictError";
-    Object.setPrototypeOf(this, DuplicateConflictError.prototype);
     this.matches = matches;
   }
 }
 
-function normalizeText(value?: string) {
+export function normalizeTitleForDuplicate(value?: string | null) {
   return (value ?? "")
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
@@ -34,36 +36,11 @@ function normalizeText(value?: string) {
     .replace(/\s+/g, " ");
 }
 
-function normalizeIsbn(value?: string) {
-  return (value ?? "").toUpperCase().replace(/[^0-9X]/g, "");
-}
-
-function isSameTitleAndAuthor(left: Book, right: Book) {
-  const leftTitle = normalizeText(left.title);
-  const rightTitle = normalizeText(right.title);
-  const leftAuthor = normalizeText(left.author);
-  const rightAuthor = normalizeText(right.author);
-
-  if (!leftTitle || !rightTitle || !leftAuthor || !rightAuthor) {
-    return false;
-  }
-
-  return leftTitle === rightTitle && leftAuthor === rightAuthor;
-}
-
-function getDuplicateReason(left: Book, right: Book): DuplicateReason | null {
-  const leftIsbn = normalizeIsbn(left.isbn);
-  const rightIsbn = normalizeIsbn(right.isbn);
-
-  if (leftIsbn && rightIsbn && leftIsbn === rightIsbn) {
-    return "isbn";
-  }
-
-  if (isSameTitleAndAuthor(left, right)) {
-    return "title_author";
-  }
-
-  return null;
+export function buildTitleDuplicateMatches(books: Book[]): DuplicateMatch[] {
+  return books.map((book) => ({
+    book,
+    reason: "title" as const
+  }));
 }
 
 export function findDuplicateMatches(
@@ -71,83 +48,64 @@ export function findDuplicateMatches(
   books: Book[],
   excludeId?: string
 ) {
-  return books.reduce<DuplicateMatch[]>((matches, book) => {
-    if (book.id === excludeId) {
-      return matches;
-    }
+  const normalizedTitle = normalizeTitleForDuplicate(candidate.title);
 
-    const reason = getDuplicateReason(candidate, book);
+  if (!normalizedTitle) {
+    return [];
+  }
 
-    if (!reason) {
-      return matches;
-    }
-
-    matches.push({ book, reason });
-    return matches;
-  }, []);
+  return buildTitleDuplicateMatches(
+    books.filter(
+      (book) =>
+        book.id !== excludeId &&
+        normalizeTitleForDuplicate(book.title) === normalizedTitle
+    )
+  );
 }
 
 export function collectDuplicateBookIds(books: Book[]) {
+  const groupedBooks = new Map<string, string[]>();
+
+  books.forEach((book) => {
+    const normalizedTitle = normalizeTitleForDuplicate(book.title);
+
+    if (!normalizedTitle) {
+      return;
+    }
+
+    const ids = groupedBooks.get(normalizedTitle) ?? [];
+    ids.push(book.id);
+    groupedBooks.set(normalizedTitle, ids);
+  });
+
   const duplicateIds = new Set<string>();
-  const booksByIsbn = new Map<string, Book[]>();
-  const booksByTitleAuthor = new Map<string, Book[]>();
 
-  for (const book of books) {
-    const normalizedIsbn = normalizeIsbn(book.isbn);
-
-    if (normalizedIsbn) {
-      const isbnGroup = booksByIsbn.get(normalizedIsbn) ?? [];
-      isbnGroup.push(book);
-      booksByIsbn.set(normalizedIsbn, isbnGroup);
+  groupedBooks.forEach((ids) => {
+    if (ids.length < 2) {
+      return;
     }
 
-    const normalizedTitle = normalizeText(book.title);
-    const normalizedAuthor = normalizeText(book.author);
-
-    if (normalizedTitle && normalizedAuthor) {
-      const titleAuthorKey = `${normalizedTitle}|${normalizedAuthor}`;
-      const titleAuthorGroup = booksByTitleAuthor.get(titleAuthorKey) ?? [];
-      titleAuthorGroup.push(book);
-      booksByTitleAuthor.set(titleAuthorKey, titleAuthorGroup);
-    }
-  }
-
-  for (const group of booksByIsbn.values()) {
-    if (group.length < 2) {
-      continue;
-    }
-
-    for (const book of group) {
-      duplicateIds.add(book.id);
-    }
-  }
-
-  for (const group of booksByTitleAuthor.values()) {
-    if (group.length < 2) {
-      continue;
-    }
-
-    for (const book of group) {
-      duplicateIds.add(book.id);
-    }
-  }
+    ids.forEach((id) => duplicateIds.add(id));
+  });
 
   return duplicateIds;
 }
 
 export function getDuplicateErrorMessage(matches: DuplicateMatch[]) {
-  const [firstMatch] = matches;
-
-  if (!firstMatch) {
-    return "Wykryto możliwy duplikat książki.";
+  if (!matches.length) {
+    return "Wykryto duplikat książki.";
   }
 
-  const reasonLabel =
-    firstMatch.reason === "isbn" ? "ten sam ISBN" : "ten sam tytuł i autora";
-
-  return `Wykryto możliwy duplikat. W katalogu jest już podobny wpis: "${firstMatch.book.title}" (${reasonLabel}).`;
+  return matches.length === 1
+    ? "W katalogu jest już książka o tym samym tytule."
+    : "W katalogu są już książki o tym samym tytule.";
 }
 
 export function getDuplicateReasonLabel(reason: DuplicateReason) {
-  return reason === "isbn" ? "Ten sam ISBN" : "Ten sam tytuł i autor";
+  switch (reason) {
+    case "title":
+      return "Ten sam tytuł";
+    default:
+      return "Duplikat";
+  }
 }

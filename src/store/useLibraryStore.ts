@@ -3,7 +3,8 @@ import { create } from "zustand";
 import {
   DuplicateConflictError,
   DuplicateSaveResolution,
-  findDuplicateMatches
+  buildTitleDuplicateMatches,
+  normalizeTitleForDuplicate
 } from "@/features/catalog/duplicateDetection";
 import { bookRepository } from "@/storage/bookRepository";
 import { Book } from "@/types/book";
@@ -140,18 +141,22 @@ export const useLibraryStore = create<LibraryState>((set, get) => ({
   saveBook: async (book, resolution) => {
     try {
       const loadedBooks = get().books;
-      const existingBooks = get().hasMoreBooks
-        ? await bookRepository.list()
-        : loadedBooks;
-      const duplicateMatches = findDuplicateMatches(book, existingBooks, book.id);
-      const currentBook = existingBooks.find((item) => item.id === book.id);
+      const currentBook = loadedBooks.find((item) => item.id === book.id);
+      const shouldCheckDuplicates =
+        !currentBook ||
+        normalizeTitleForDuplicate(currentBook.title) !==
+          normalizeTitleForDuplicate(book.title);
+      const duplicateBooks = shouldCheckDuplicates
+        ? await bookRepository.findByNormalizedTitle(book.title, book.id)
+        : [];
+      const duplicateMatches = buildTitleDuplicateMatches(duplicateBooks);
 
       if (duplicateMatches.length && !resolution) {
         throw new DuplicateConflictError(duplicateMatches);
       }
 
       if (resolution?.mode === "overwrite") {
-        const targetBook = existingBooks.find(
+        const targetBook = duplicateBooks.find(
           (item) => item.id === resolution.targetBookId
         );
 
