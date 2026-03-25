@@ -14,6 +14,9 @@ const LIBRARY_PAGE_SIZE = 80;
 interface LibraryState {
   books: Book[];
   totalBooks: number;
+  withoutLocationCount: number;
+  withoutIsbnCount: number;
+  withoutGenreCount: number;
   hasMoreBooks: boolean;
   isLoading: boolean;
   isLoadingMore: boolean;
@@ -60,6 +63,9 @@ function upsertBooksInCollection(books: Book[], nextBooks: Book[]) {
 export const useLibraryStore = create<LibraryState>((set, get) => ({
   books: [],
   totalBooks: 0,
+  withoutLocationCount: 0,
+  withoutIsbnCount: 0,
+  withoutGenreCount: 0,
   hasMoreBooks: false,
   isLoading: false,
   isLoadingMore: false,
@@ -68,15 +74,18 @@ export const useLibraryStore = create<LibraryState>((set, get) => ({
     set({ isLoading: true, errorMessage: null });
 
     try {
-      const [totalBooks, books] = await Promise.all([
-        bookRepository.count(),
+      const [stats, books] = await Promise.all([
+        bookRepository.getStats(),
         bookRepository.listPage(0, LIBRARY_PAGE_SIZE)
       ]);
 
       set({
         books,
-        totalBooks,
-        hasMoreBooks: books.length < totalBooks,
+        totalBooks: stats.totalBooks,
+        withoutLocationCount: stats.withoutLocationCount,
+        withoutIsbnCount: stats.withoutIsbnCount,
+        withoutGenreCount: stats.withoutGenreCount,
+        hasMoreBooks: books.length < stats.totalBooks,
         isLoading: false,
         isLoadingMore: false,
         errorMessage: null
@@ -180,20 +189,28 @@ export const useLibraryStore = create<LibraryState>((set, get) => ({
           (item) => item.id !== targetBook.id && item.id !== currentBook?.id
         );
         const nextBooks = upsertBookInCollection(nextLoadedBooks, overwrittenBook);
+        const nextStats = await bookRepository.getStats();
 
         set({
           books: nextBooks,
-          hasMoreBooks: nextBooks.length < get().totalBooks,
+          totalBooks: nextStats.totalBooks,
+          withoutLocationCount: nextStats.withoutLocationCount,
+          withoutIsbnCount: nextStats.withoutIsbnCount,
+          withoutGenreCount: nextStats.withoutGenreCount,
+          hasMoreBooks: nextBooks.length < nextStats.totalBooks,
           errorMessage: null
         });
       } else {
         await bookRepository.save(book);
         const nextBooks = upsertBookInCollection(loadedBooks, book);
-        const nextTotalBooks = currentBook ? get().totalBooks : get().totalBooks + 1;
+        const nextStats = await bookRepository.getStats();
         set({
           books: nextBooks,
-          totalBooks: nextTotalBooks,
-          hasMoreBooks: nextBooks.length < nextTotalBooks,
+          totalBooks: nextStats.totalBooks,
+          withoutLocationCount: nextStats.withoutLocationCount,
+          withoutIsbnCount: nextStats.withoutIsbnCount,
+          withoutGenreCount: nextStats.withoutGenreCount,
+          hasMoreBooks: nextBooks.length < nextStats.totalBooks,
           errorMessage: null
         });
       }
@@ -214,12 +231,15 @@ export const useLibraryStore = create<LibraryState>((set, get) => ({
     try {
       await bookRepository.saveMany(booksToSave);
       const nextBooks = upsertBooksInCollection(get().books, booksToSave);
-      const nextTotalBooks = await bookRepository.count();
+      const nextStats = await bookRepository.getStats();
 
       set({
         books: nextBooks,
-        totalBooks: nextTotalBooks,
-        hasMoreBooks: nextBooks.length < nextTotalBooks,
+        totalBooks: nextStats.totalBooks,
+        withoutLocationCount: nextStats.withoutLocationCount,
+        withoutIsbnCount: nextStats.withoutIsbnCount,
+        withoutGenreCount: nextStats.withoutGenreCount,
+        hasMoreBooks: nextBooks.length < nextStats.totalBooks,
         errorMessage: null
       });
     } catch (error) {
@@ -247,10 +267,15 @@ export const useLibraryStore = create<LibraryState>((set, get) => ({
             }
           : book
       );
+      const nextStats = await bookRepository.getStats();
 
       set({
         books: nextBooks,
-        hasMoreBooks: nextBooks.length < get().totalBooks,
+        totalBooks: nextStats.totalBooks,
+        withoutLocationCount: nextStats.withoutLocationCount,
+        withoutIsbnCount: nextStats.withoutIsbnCount,
+        withoutGenreCount: nextStats.withoutGenreCount,
+        hasMoreBooks: nextBooks.length < nextStats.totalBooks,
         errorMessage: null
       });
     } catch (error) {
@@ -270,11 +295,14 @@ export const useLibraryStore = create<LibraryState>((set, get) => ({
     try {
       await bookRepository.remove(id);
       const nextBooks = get().books.filter((book) => book.id !== id);
-      const nextTotalBooks = Math.max(0, get().totalBooks - 1);
+      const nextStats = await bookRepository.getStats();
       set({
         books: nextBooks,
-        totalBooks: nextTotalBooks,
-        hasMoreBooks: nextBooks.length < nextTotalBooks,
+        totalBooks: nextStats.totalBooks,
+        withoutLocationCount: nextStats.withoutLocationCount,
+        withoutIsbnCount: nextStats.withoutIsbnCount,
+        withoutGenreCount: nextStats.withoutGenreCount,
+        hasMoreBooks: nextBooks.length < nextStats.totalBooks,
         errorMessage: null
       });
     } catch (error) {

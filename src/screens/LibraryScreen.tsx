@@ -46,6 +46,9 @@ export function LibraryScreen({ onStartScan }: LibraryScreenProps) {
   const {
     books,
     totalBooks,
+    withoutLocationCount,
+    withoutIsbnCount,
+    withoutGenreCount,
     hasMoreBooks,
     isLoading,
     isLoadingMore,
@@ -238,21 +241,6 @@ export function LibraryScreen({ onStartScan }: LibraryScreenProps) {
 
     return sortedBooks;
   }, [activeQuickFilter, books, genreFilter, locationFilter, query, sortKey]);
-
-  const visibleWithoutLocationCount = useMemo(
-    () => visibleBooks.filter((book) => !book.shelfLocation?.trim()).length,
-    [visibleBooks]
-  );
-
-  const visibleWithoutIsbnCount = useMemo(
-    () => visibleBooks.filter((book) => !book.isbn?.trim()).length,
-    [visibleBooks]
-  );
-
-  const visibleWithoutGenreCount = useMemo(
-    () => visibleBooks.filter((book) => !book.genre?.trim()).length,
-    [visibleBooks]
-  );
 
   const quickFilteredLookupBooks = useMemo(() => {
     if (activeQuickFilter !== "no_isbn" && activeQuickFilter !== "no_genre") {
@@ -762,7 +750,7 @@ export function LibraryScreen({ onStartScan }: LibraryScreenProps) {
                     : null
                 ]}
               >
-                {appText.library.visibleWithoutLocationLabel(visibleWithoutLocationCount)}
+                {appText.library.visibleWithoutLocationLabel(withoutLocationCount)}
               </Text>
             </Pressable>
             <Pressable
@@ -783,7 +771,7 @@ export function LibraryScreen({ onStartScan }: LibraryScreenProps) {
                     : null
                 ]}
               >
-                {appText.library.visibleWithoutIsbnLabel(visibleWithoutIsbnCount)}
+                {appText.library.visibleWithoutIsbnLabel(withoutIsbnCount)}
               </Text>
             </Pressable>
             <Pressable
@@ -804,7 +792,7 @@ export function LibraryScreen({ onStartScan }: LibraryScreenProps) {
                     : null
                 ]}
               >
-                {appText.library.visibleWithoutGenreLabel(visibleWithoutGenreCount)}
+                {appText.library.visibleWithoutGenreLabel(withoutGenreCount)}
               </Text>
             </Pressable>
           </View>

@@ -8,6 +8,12 @@ export interface BookRepository {
   list(): Promise<Book[]>;
   listPage(offset: number, limit: number): Promise<Book[]>;
   count(): Promise<number>;
+  getStats(): Promise<{
+    totalBooks: number;
+    withoutLocationCount: number;
+    withoutIsbnCount: number;
+    withoutGenreCount: number;
+  }>;
   findByNormalizedTitle(title: string, excludeId?: string): Promise<Book[]>;
   save(book: Book): Promise<void>;
   saveMany(books: Book[]): Promise<void>;
@@ -134,6 +140,30 @@ class SQLiteBookRepository implements BookRepository {
     );
 
     return result?.count ?? 0;
+  }
+
+  async getStats() {
+    const db = await getDatabase();
+    const result = await db.getFirstAsync<{
+      totalBooks: number;
+      withoutLocationCount: number;
+      withoutIsbnCount: number;
+      withoutGenreCount: number;
+    }>(`
+      SELECT
+        COUNT(*) as totalBooks,
+        SUM(CASE WHEN shelfLocation IS NULL OR TRIM(shelfLocation) = '' THEN 1 ELSE 0 END) as withoutLocationCount,
+        SUM(CASE WHEN isbn IS NULL OR TRIM(isbn) = '' THEN 1 ELSE 0 END) as withoutIsbnCount,
+        SUM(CASE WHEN genre IS NULL OR TRIM(genre) = '' THEN 1 ELSE 0 END) as withoutGenreCount
+      FROM books
+    `);
+
+    return {
+      totalBooks: result?.totalBooks ?? 0,
+      withoutLocationCount: result?.withoutLocationCount ?? 0,
+      withoutIsbnCount: result?.withoutIsbnCount ?? 0,
+      withoutGenreCount: result?.withoutGenreCount ?? 0
+    };
   }
 
   async findByNormalizedTitle(title: string, excludeId?: string) {
