@@ -94,7 +94,7 @@ class SQLiteBookRepository implements BookRepository {
           createdAt,
           updatedAt
         FROM books
-        ORDER BY datetime(updatedAt) DESC, rowid DESC
+        ORDER BY updatedAt DESC, rowid DESC
       `
     );
   }

@@ -89,20 +89,46 @@ export function findDuplicateMatches(
 
 export function collectDuplicateBookIds(books: Book[]) {
   const duplicateIds = new Set<string>();
+  const booksByIsbn = new Map<string, Book[]>();
+  const booksByTitleAuthor = new Map<string, Book[]>();
 
-  for (let index = 0; index < books.length; index += 1) {
-    const currentBook = books[index];
+  for (const book of books) {
+    const normalizedIsbn = normalizeIsbn(book.isbn);
 
-    for (let compareIndex = index + 1; compareIndex < books.length; compareIndex += 1) {
-      const comparedBook = books[compareIndex];
-      const reason = getDuplicateReason(currentBook, comparedBook);
+    if (normalizedIsbn) {
+      const isbnGroup = booksByIsbn.get(normalizedIsbn) ?? [];
+      isbnGroup.push(book);
+      booksByIsbn.set(normalizedIsbn, isbnGroup);
+    }
 
-      if (!reason) {
-        continue;
-      }
+    const normalizedTitle = normalizeText(book.title);
+    const normalizedAuthor = normalizeText(book.author);
 
-      duplicateIds.add(currentBook.id);
-      duplicateIds.add(comparedBook.id);
+    if (normalizedTitle && normalizedAuthor) {
+      const titleAuthorKey = `${normalizedTitle}|${normalizedAuthor}`;
+      const titleAuthorGroup = booksByTitleAuthor.get(titleAuthorKey) ?? [];
+      titleAuthorGroup.push(book);
+      booksByTitleAuthor.set(titleAuthorKey, titleAuthorGroup);
+    }
+  }
+
+  for (const group of booksByIsbn.values()) {
+    if (group.length < 2) {
+      continue;
+    }
+
+    for (const book of group) {
+      duplicateIds.add(book.id);
+    }
+  }
+
+  for (const group of booksByTitleAuthor.values()) {
+    if (group.length < 2) {
+      continue;
+    }
+
+    for (const book of group) {
+      duplicateIds.add(book.id);
     }
   }
 
