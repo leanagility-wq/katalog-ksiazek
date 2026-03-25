@@ -51,7 +51,6 @@ export function LibraryScreen({ onStartScan }: LibraryScreenProps) {
     isLoadingMore,
     errorMessage,
     loadMoreBooks,
-    loadAllBooks,
     saveBook,
     saveBooksBulk,
     applyBatchUpdate,
@@ -280,7 +279,7 @@ export function LibraryScreen({ onStartScan }: LibraryScreenProps) {
 
   useEffect(() => {
     if (hasActiveCatalogFilters && hasMoreBooks && !isLoading && !isLoadingMore) {
-      void loadAllBooks();
+      void loadMoreBooks();
     }
   }, [
     activeQuickFilter,
@@ -289,7 +288,7 @@ export function LibraryScreen({ onStartScan }: LibraryScreenProps) {
     hasMoreBooks,
     isLoading,
     isLoadingMore,
-    loadAllBooks,
+    loadMoreBooks,
     locationFilter,
     query
   ]);
