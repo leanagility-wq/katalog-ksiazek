@@ -49,12 +49,14 @@ export function LibraryScreen({ onStartScan }: LibraryScreenProps) {
     withoutLocationCount,
     withoutIsbnCount,
     withoutGenreCount,
+    catalogLocations,
+    catalogGenres,
     hasMoreBooks,
     isLoading,
     isLoadingMore,
     errorMessage,
     loadMoreBooks,
-    saveBook,
+    quickUpdateBook,
     saveBooksBulk,
     applyBatchUpdate,
     deleteBook
@@ -95,12 +97,12 @@ export function LibraryScreen({ onStartScan }: LibraryScreenProps) {
     () =>
       Array.from(
         new Set(
-          [...savedLocations, ...books.map((book) => book.shelfLocation ?? "")]
+          [...savedLocations, ...catalogLocations]
             .map((value) => value.trim())
             .filter(Boolean)
         )
       ).sort((left, right) => left.localeCompare(right, "pl")),
-    [books, savedLocations]
+    [catalogLocations, savedLocations]
   );
 
   const genreOptions = useMemo(
@@ -109,13 +111,13 @@ export function LibraryScreen({ onStartScan }: LibraryScreenProps) {
         ALL_GENRES_FILTER,
         ...Array.from(
           new Set(
-            [...savedGenres, ...books.map((book) => normalizeGenreLabel(book.genre) ?? "")]
+            [...savedGenres, ...catalogGenres.map((genre) => normalizeGenreLabel(genre) ?? "")]
               .map((value) => value.trim())
               .filter(Boolean)
           )
         ).sort((left, right) => left.localeCompare(right, "pl"))
       ],
-    [books, savedGenres]
+    [catalogGenres, savedGenres]
   );
   const quickGenreOptions = useMemo(
     () => genreOptions.filter((option) => option !== ALL_GENRES_FILTER),
@@ -411,10 +413,7 @@ export function LibraryScreen({ onStartScan }: LibraryScreenProps) {
     setUpdatingBookId(book.id);
 
     try {
-      await saveBook({
-        ...book,
-        ...changes
-      });
+      await quickUpdateBook(book.id, changes);
       closeQuickEdit();
     } finally {
       setUpdatingBookId(null);
@@ -664,12 +663,8 @@ export function LibraryScreen({ onStartScan }: LibraryScreenProps) {
         !isSelectionMode && quickEditBookId === item.id ? quickEditMode : null
       }
       isUpdating={updatingBookId === item.id}
-      locationOptions={locationOptions.filter(
-        (location) => location !== item.shelfLocation
-      )}
-      genreOptions={quickGenreOptions.filter(
-        (genre) => genre !== normalizeGenreLabel(item.genre)
-      )}
+      locationOptions={locationOptions}
+      genreOptions={quickGenreOptions}
       onToggleQuickEdit={(mode) => handleQuickEditToggle(item.id, mode)}
       onQuickStatusSelect={(status) => {
         void handleQuickStatusSelect(item, status);

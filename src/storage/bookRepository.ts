@@ -14,7 +14,15 @@ export interface BookRepository {
     withoutIsbnCount: number;
     withoutGenreCount: number;
   }>;
+  getFilterOptions(): Promise<{
+    locations: string[];
+    genres: string[];
+  }>;
   findByNormalizedTitle(title: string, excludeId?: string): Promise<Book[]>;
+  updateQuickFields(
+    id: string,
+    changes: Partial<Pick<Book, "status" | "shelfLocation" | "genre">>
+  ): Promise<void>;
   save(book: Book): Promise<void>;
   saveMany(books: Book[]): Promise<void>;
   updateMany(
@@ -25,6 +33,17 @@ export interface BookRepository {
 }
 
 class SQLiteBookRepository implements BookRepository {
+  private sortUniqueValues(values: Array<string | null | undefined>) {
+    return Array.from(
+      new Set(
+        values
+          .map((value) => normalizeStoredText(value) ?? "")
+          .map((value) => value.trim())
+          .filter(Boolean)
+      )
+    ).sort((left, right) => left.localeCompare(right, "pl"));
+  }
+
   private normalizeBook(book: Book): Book {
     return {
       ...book,
@@ -166,6 +185,27 @@ class SQLiteBookRepository implements BookRepository {
     };
   }
 
+  async getFilterOptions() {
+    const db = await getDatabase();
+    const [locations, genres] = await Promise.all([
+      db.getAllAsync<{ value: string | null }>(`
+        SELECT DISTINCT shelfLocation as value
+        FROM books
+        WHERE shelfLocation IS NOT NULL AND TRIM(shelfLocation) <> ''
+      `),
+      db.getAllAsync<{ value: string | null }>(`
+        SELECT DISTINCT genre as value
+        FROM books
+        WHERE genre IS NOT NULL AND TRIM(genre) <> ''
+      `)
+    ]);
+
+    return {
+      locations: this.sortUniqueValues(locations.map((entry) => entry.value)),
+      genres: this.sortUniqueValues(genres.map((entry) => entry.value))
+    };
+  }
+
   async findByNormalizedTitle(title: string, excludeId?: string) {
     const db = await getDatabase();
     const normalizedTitle = normalizeTitleForDuplicate(title);
@@ -183,6 +223,38 @@ class SQLiteBookRepository implements BookRepository {
       WHERE normalizedTitle = ${toSqlValue(normalizedTitle)}
       ${excludeClause}
       ${this.baseOrderBy}
+    `);
+  }
+
+  async updateQuickFields(
+    id: string,
+    changes: Partial<Pick<Book, "status" | "shelfLocation" | "genre">>
+  ) {
+    const db = await getDatabase();
+    const updates: string[] = [];
+
+    if (Object.prototype.hasOwnProperty.call(changes, "status")) {
+      updates.push(`status = ${toSqlValue(changes.status ?? null)}`);
+    }
+
+    if (Object.prototype.hasOwnProperty.call(changes, "shelfLocation")) {
+      const normalizedShelfLocation = normalizeStoredText(changes.shelfLocation);
+      updates.push(`shelfLocation = ${toSqlValue(normalizedShelfLocation)}`);
+    }
+
+    if (Object.prototype.hasOwnProperty.call(changes, "genre")) {
+      const normalizedGenre = normalizeStoredText(changes.genre);
+      updates.push(`genre = ${toSqlValue(normalizedGenre)}`);
+    }
+
+    if (!updates.length) {
+      return;
+    }
+
+    await db.execAsync(`
+      UPDATE books
+      SET ${updates.join(", ")}
+      WHERE id = ${toSqlValue(id)};
     `);
   }
 

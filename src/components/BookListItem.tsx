@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { memo, useEffect, useMemo, useState } from "react";
 import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 
 import {
@@ -31,7 +31,7 @@ interface BookListItemProps {
   onDeletePress?: () => void;
 }
 
-export function BookListItem({
+function BookListItemComponent({
   book,
   isDuplicate = false,
   isSelectable = false,
@@ -53,6 +53,14 @@ export function BookListItem({
   const bookGenre = normalizeGenreLabel(book.genre);
   const [locationDraft, setLocationDraft] = useState(book.shelfLocation ?? "");
   const [genreDraft, setGenreDraft] = useState(bookGenre ?? "");
+  const quickLocationOptions = useMemo(
+    () => locationOptions.filter((location) => location !== book.shelfLocation),
+    [book.shelfLocation, locationOptions]
+  );
+  const quickGenreOptions = useMemo(
+    () => genreOptions.filter((genre) => genre !== bookGenre),
+    [bookGenre, genreOptions]
+  );
 
   useEffect(() => {
     setLocationDraft(book.shelfLocation ?? "");
@@ -188,9 +196,9 @@ export function BookListItem({
       {quickEditMode === "location" && !isSelectable ? (
         <View style={styles.quickPanel}>
           <Text style={styles.quickTitle}>Zmień lokalizację</Text>
-          {locationOptions.length ? (
+          {quickLocationOptions.length ? (
             <View style={styles.quickOptions}>
-              {locationOptions.map((option) => (
+              {quickLocationOptions.map((option) => (
                 <Pressable
                   key={option}
                   onPress={() => onQuickLocationSave(option)}
@@ -233,9 +241,9 @@ export function BookListItem({
       {quickEditMode === "genre" && !isSelectable ? (
         <View style={styles.quickPanel}>
           <Text style={styles.quickTitle}>Zmień gatunek</Text>
-          {genreOptions.length ? (
+          {quickGenreOptions.length ? (
             <View style={styles.quickOptions}>
-              {genreOptions.map((option) => (
+              {quickGenreOptions.map((option) => (
                 <Pressable
                   key={option}
                   onPress={() => onQuickGenreSave(option)}
@@ -277,6 +285,21 @@ export function BookListItem({
     </View>
   );
 }
+
+function areEqual(prevProps: BookListItemProps, nextProps: BookListItemProps) {
+  return (
+    prevProps.book === nextProps.book &&
+    prevProps.isDuplicate === nextProps.isDuplicate &&
+    prevProps.isSelectable === nextProps.isSelectable &&
+    prevProps.isSelected === nextProps.isSelected &&
+    prevProps.quickEditMode === nextProps.quickEditMode &&
+    prevProps.isUpdating === nextProps.isUpdating &&
+    prevProps.locationOptions === nextProps.locationOptions &&
+    prevProps.genreOptions === nextProps.genreOptions
+  );
+}
+
+export const BookListItem = memo(BookListItemComponent, areEqual);
 
 const styles = StyleSheet.create({
   wrapper: {

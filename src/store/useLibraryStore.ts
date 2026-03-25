@@ -17,6 +17,8 @@ interface LibraryState {
   withoutLocationCount: number;
   withoutIsbnCount: number;
   withoutGenreCount: number;
+  catalogLocations: string[];
+  catalogGenres: string[];
   hasMoreBooks: boolean;
   isLoading: boolean;
   isLoadingMore: boolean;
@@ -25,6 +27,10 @@ interface LibraryState {
   loadMoreBooks: () => Promise<void>;
   loadAllBooks: () => Promise<void>;
   saveBook: (book: Book, resolution?: DuplicateSaveResolution) => Promise<void>;
+  quickUpdateBook: (
+    id: string,
+    changes: Partial<Pick<Book, "status" | "shelfLocation" | "genre">>
+  ) => Promise<void>;
   saveBooksBulk: (books: Book[]) => Promise<void>;
   applyBatchUpdate: (
     ids: string[],
@@ -60,12 +66,48 @@ function upsertBooksInCollection(books: Book[], nextBooks: Book[]) {
   return sortBooksForDisplay([...preservedBooks, ...nextBooks]);
 }
 
+function sortUniqueValues(values: Array<string | undefined>) {
+  return Array.from(new Set(values.map((value) => value?.trim() ?? "").filter(Boolean))).sort(
+    (left, right) => left.localeCompare(right, "pl")
+  );
+}
+
+function hasValue(value?: string) {
+  return Boolean(value?.trim());
+}
+
+function applyStatsDelta(
+  current: Pick<
+    LibraryState,
+    "withoutLocationCount" | "withoutIsbnCount" | "withoutGenreCount"
+  >,
+  previousBook: Book,
+  nextBook: Book
+) {
+  return {
+    withoutLocationCount:
+      current.withoutLocationCount +
+      Number(!hasValue(nextBook.shelfLocation)) -
+      Number(!hasValue(previousBook.shelfLocation)),
+    withoutIsbnCount:
+      current.withoutIsbnCount +
+      Number(!hasValue(nextBook.isbn)) -
+      Number(!hasValue(previousBook.isbn)),
+    withoutGenreCount:
+      current.withoutGenreCount +
+      Number(!hasValue(nextBook.genre)) -
+      Number(!hasValue(previousBook.genre))
+  };
+}
+
 export const useLibraryStore = create<LibraryState>((set, get) => ({
   books: [],
   totalBooks: 0,
   withoutLocationCount: 0,
   withoutIsbnCount: 0,
   withoutGenreCount: 0,
+  catalogLocations: [],
+  catalogGenres: [],
   hasMoreBooks: false,
   isLoading: false,
   isLoadingMore: false,
@@ -74,8 +116,9 @@ export const useLibraryStore = create<LibraryState>((set, get) => ({
     set({ isLoading: true, errorMessage: null });
 
     try {
-      const [stats, books] = await Promise.all([
+      const [stats, filterOptions, books] = await Promise.all([
         bookRepository.getStats(),
+        bookRepository.getFilterOptions(),
         bookRepository.listPage(0, LIBRARY_PAGE_SIZE)
       ]);
 
@@ -85,6 +128,8 @@ export const useLibraryStore = create<LibraryState>((set, get) => ({
         withoutLocationCount: stats.withoutLocationCount,
         withoutIsbnCount: stats.withoutIsbnCount,
         withoutGenreCount: stats.withoutGenreCount,
+        catalogLocations: filterOptions.locations,
+        catalogGenres: filterOptions.genres,
         hasMoreBooks: books.length < stats.totalBooks,
         isLoading: false,
         isLoadingMore: false,
@@ -189,7 +234,10 @@ export const useLibraryStore = create<LibraryState>((set, get) => ({
           (item) => item.id !== targetBook.id && item.id !== currentBook?.id
         );
         const nextBooks = upsertBookInCollection(nextLoadedBooks, overwrittenBook);
-        const nextStats = await bookRepository.getStats();
+        const [nextStats, nextFilterOptions] = await Promise.all([
+          bookRepository.getStats(),
+          bookRepository.getFilterOptions()
+        ]);
 
         set({
           books: nextBooks,
@@ -197,19 +245,26 @@ export const useLibraryStore = create<LibraryState>((set, get) => ({
           withoutLocationCount: nextStats.withoutLocationCount,
           withoutIsbnCount: nextStats.withoutIsbnCount,
           withoutGenreCount: nextStats.withoutGenreCount,
+          catalogLocations: nextFilterOptions.locations,
+          catalogGenres: nextFilterOptions.genres,
           hasMoreBooks: nextBooks.length < nextStats.totalBooks,
           errorMessage: null
         });
       } else {
         await bookRepository.save(book);
         const nextBooks = upsertBookInCollection(loadedBooks, book);
-        const nextStats = await bookRepository.getStats();
+        const [nextStats, nextFilterOptions] = await Promise.all([
+          bookRepository.getStats(),
+          bookRepository.getFilterOptions()
+        ]);
         set({
           books: nextBooks,
           totalBooks: nextStats.totalBooks,
           withoutLocationCount: nextStats.withoutLocationCount,
           withoutIsbnCount: nextStats.withoutIsbnCount,
           withoutGenreCount: nextStats.withoutGenreCount,
+          catalogLocations: nextFilterOptions.locations,
+          catalogGenres: nextFilterOptions.genres,
           hasMoreBooks: nextBooks.length < nextStats.totalBooks,
           errorMessage: null
         });
@@ -227,11 +282,63 @@ export const useLibraryStore = create<LibraryState>((set, get) => ({
       throw resolvedError;
     }
   },
+  quickUpdateBook: async (id, changes) => {
+    try {
+      const currentState = get();
+      const previousBook = currentState.books.find((item) => item.id === id);
+
+      if (!previousBook) {
+        return;
+      }
+
+      const nextBook: Book = {
+        ...previousBook,
+        ...changes
+      };
+
+      await bookRepository.updateQuickFields(id, changes);
+
+      const nextBooks = upsertBookInCollection(currentState.books, nextBook);
+      const nextStats = applyStatsDelta(currentState, previousBook, nextBook);
+      const nextCatalogLocations = sortUniqueValues([
+        ...currentState.catalogLocations,
+        ...nextBooks.map((book) => book.shelfLocation)
+      ]);
+      const nextCatalogGenres = sortUniqueValues([
+        ...currentState.catalogGenres,
+        ...nextBooks.map((book) => book.genre)
+      ]);
+
+      set({
+        books: nextBooks,
+        withoutLocationCount: nextStats.withoutLocationCount,
+        withoutIsbnCount: nextStats.withoutIsbnCount,
+        withoutGenreCount: nextStats.withoutGenreCount,
+        catalogLocations: nextCatalogLocations,
+        catalogGenres: nextCatalogGenres,
+        errorMessage: null
+      });
+    } catch (error) {
+      const resolvedError = toLibraryError(
+        error,
+        "Nie udało się zapisać szybkiej zmiany."
+      );
+
+      set({
+        errorMessage: resolvedError.message
+      });
+
+      throw resolvedError;
+    }
+  },
   saveBooksBulk: async (booksToSave) => {
     try {
       await bookRepository.saveMany(booksToSave);
       const nextBooks = upsertBooksInCollection(get().books, booksToSave);
-      const nextStats = await bookRepository.getStats();
+      const [nextStats, nextFilterOptions] = await Promise.all([
+        bookRepository.getStats(),
+        bookRepository.getFilterOptions()
+      ]);
 
       set({
         books: nextBooks,
@@ -239,6 +346,8 @@ export const useLibraryStore = create<LibraryState>((set, get) => ({
         withoutLocationCount: nextStats.withoutLocationCount,
         withoutIsbnCount: nextStats.withoutIsbnCount,
         withoutGenreCount: nextStats.withoutGenreCount,
+        catalogLocations: nextFilterOptions.locations,
+        catalogGenres: nextFilterOptions.genres,
         hasMoreBooks: nextBooks.length < nextStats.totalBooks,
         errorMessage: null
       });
@@ -267,7 +376,10 @@ export const useLibraryStore = create<LibraryState>((set, get) => ({
             }
           : book
       );
-      const nextStats = await bookRepository.getStats();
+      const [nextStats, nextFilterOptions] = await Promise.all([
+        bookRepository.getStats(),
+        bookRepository.getFilterOptions()
+      ]);
 
       set({
         books: nextBooks,
@@ -275,6 +387,8 @@ export const useLibraryStore = create<LibraryState>((set, get) => ({
         withoutLocationCount: nextStats.withoutLocationCount,
         withoutIsbnCount: nextStats.withoutIsbnCount,
         withoutGenreCount: nextStats.withoutGenreCount,
+        catalogLocations: nextFilterOptions.locations,
+        catalogGenres: nextFilterOptions.genres,
         hasMoreBooks: nextBooks.length < nextStats.totalBooks,
         errorMessage: null
       });
@@ -295,13 +409,18 @@ export const useLibraryStore = create<LibraryState>((set, get) => ({
     try {
       await bookRepository.remove(id);
       const nextBooks = get().books.filter((book) => book.id !== id);
-      const nextStats = await bookRepository.getStats();
+      const [nextStats, nextFilterOptions] = await Promise.all([
+        bookRepository.getStats(),
+        bookRepository.getFilterOptions()
+      ]);
       set({
         books: nextBooks,
         totalBooks: nextStats.totalBooks,
         withoutLocationCount: nextStats.withoutLocationCount,
         withoutIsbnCount: nextStats.withoutIsbnCount,
         withoutGenreCount: nextStats.withoutGenreCount,
+        catalogLocations: nextFilterOptions.locations,
+        catalogGenres: nextFilterOptions.genres,
         hasMoreBooks: nextBooks.length < nextStats.totalBooks,
         errorMessage: null
       });
