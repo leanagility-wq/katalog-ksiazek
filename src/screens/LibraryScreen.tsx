@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import {
   Alert,
   FlatList,
@@ -86,6 +86,7 @@ export function LibraryScreen({ onStartScan }: LibraryScreenProps) {
     useState<QuickCatalogFilter>(null);
   const selectedBookIdsRef = useRef<string[]>([]);
   const searchDraftRef = useRef("");
+  const [, startTransition] = useTransition();
 
   const isSelectionMode = selectedBookIds.length > 0;
 
@@ -177,14 +178,33 @@ export function LibraryScreen({ onStartScan }: LibraryScreenProps) {
     [selectedBooks]
   );
 
+  const indexedBooks = useMemo(
+    () =>
+      books.map((book) => ({
+        book,
+        normalizedGenre: normalizeGenreLabel(book.genre) ?? "",
+        normalizedLocation: book.shelfLocation?.trim() ?? "",
+        searchableText: [
+          book.title,
+          book.author,
+          book.genre,
+          book.isbn,
+          book.shelfLocation,
+          book.notes
+        ]
+          .filter(Boolean)
+          .join(" ")
+          .toLowerCase()
+      })),
+    [books]
+  );
+
   const visibleBooks = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
-    const matchesGenreFilter = (book: Book) =>
-      genreFilter === ALL_GENRES_FILTER ||
-      normalizeGenreLabel(book.genre) === genreFilter;
-    const matchesLocationFilter = (book: Book) =>
-      locationFilter === ALL_LOCATIONS_FILTER ||
-      (book.shelfLocation?.trim() ?? "") === locationFilter;
+    const matchesGenreFilter = (normalizedGenre: string) =>
+      genreFilter === ALL_GENRES_FILTER || normalizedGenre === genreFilter;
+    const matchesLocationFilter = (normalizedLocation: string) =>
+      locationFilter === ALL_LOCATIONS_FILTER || normalizedLocation === locationFilter;
     const matchesQuickFilter = (book: Book) => {
       switch (activeQuickFilter) {
         case "no_location":
@@ -198,10 +218,11 @@ export function LibraryScreen({ onStartScan }: LibraryScreenProps) {
       }
     };
 
-    const filteredBooks = books.filter((book) => {
+    const filteredBooks = indexedBooks
+      .filter(({ book, normalizedGenre, normalizedLocation, searchableText }) => {
       if (
-        !matchesGenreFilter(book) ||
-        !matchesLocationFilter(book) ||
+        !matchesGenreFilter(normalizedGenre) ||
+        !matchesLocationFilter(normalizedLocation) ||
         !matchesQuickFilter(book)
       ) {
         return false;
@@ -211,17 +232,9 @@ export function LibraryScreen({ onStartScan }: LibraryScreenProps) {
         return true;
       }
 
-      return [
-        book.title,
-        book.author,
-        book.genre,
-        book.isbn,
-        book.shelfLocation,
-        book.notes
-      ]
-        .filter(Boolean)
-        .some((value) => value?.toLowerCase().includes(normalizedQuery));
-    });
+        return searchableText.includes(normalizedQuery);
+      })
+      .map(({ book }) => book);
 
     const sortedBooks = [...filteredBooks];
 
@@ -243,7 +256,7 @@ export function LibraryScreen({ onStartScan }: LibraryScreenProps) {
     });
 
     return sortedBooks;
-  }, [activeQuickFilter, books, genreFilter, locationFilter, query, sortKey]);
+  }, [activeQuickFilter, genreFilter, indexedBooks, locationFilter, query, sortKey]);
 
   const quickFilteredLookupBooks = useMemo(() => {
     if (activeQuickFilter !== "no_isbn" && activeQuickFilter !== "no_genre") {
@@ -279,7 +292,10 @@ export function LibraryScreen({ onStartScan }: LibraryScreenProps) {
       filters.push({
         key: "genre",
         label: appText.library.activeGenreFilterLabel(genreFilter),
-        onClear: () => setGenreFilter(ALL_GENRES_FILTER)
+        onClear: () =>
+          startTransition(() => {
+            setGenreFilter(ALL_GENRES_FILTER);
+          })
       });
     }
 
@@ -287,12 +303,15 @@ export function LibraryScreen({ onStartScan }: LibraryScreenProps) {
       filters.push({
         key: "location",
         label: appText.library.activeLocationFilterLabel(locationFilter),
-        onClear: () => setLocationFilter(ALL_LOCATIONS_FILTER)
+        onClear: () =>
+          startTransition(() => {
+            setLocationFilter(ALL_LOCATIONS_FILTER);
+          })
       });
     }
 
     return filters;
-  }, [genreFilter, locationFilter]);
+  }, [genreFilter, locationFilter, startTransition]);
 
   useEffect(() => {
     if (hasActiveCatalogFilters && hasMoreBooks && !isLoading && !isLoadingMore) {
@@ -851,7 +870,11 @@ export function LibraryScreen({ onStartScan }: LibraryScreenProps) {
                   return (
                     <Pressable
                       key={option}
-                      onPress={() => setGenreFilter(option)}
+                      onPress={() =>
+                        startTransition(() => {
+                          setGenreFilter(option);
+                        })
+                      }
                       style={[
                         styles.genreChip,
                         isActive ? styles.genreChipActive : null
@@ -884,7 +907,11 @@ export function LibraryScreen({ onStartScan }: LibraryScreenProps) {
                   return (
                     <Pressable
                       key={option}
-                      onPress={() => setLocationFilter(option)}
+                      onPress={() =>
+                        startTransition(() => {
+                          setLocationFilter(option);
+                        })
+                      }
                       style={[
                         styles.genreChip,
                         isActive ? styles.genreChipActive : null
