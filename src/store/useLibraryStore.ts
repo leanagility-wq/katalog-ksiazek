@@ -26,7 +26,30 @@ function toLibraryError(error: unknown, fallbackMessage: string) {
   return error instanceof Error ? error : new Error(fallbackMessage);
 }
 
-export const useLibraryStore = create<LibraryState>((set) => ({
+function sortBooksForDisplay(books: Book[]) {
+  return [...books].sort((left, right) => {
+    const updatedAtOrder = right.updatedAt.localeCompare(left.updatedAt);
+
+    if (updatedAtOrder !== 0) {
+      return updatedAtOrder;
+    }
+
+    return right.id.localeCompare(left.id);
+  });
+}
+
+function upsertBookInCollection(books: Book[], nextBook: Book) {
+  const withoutExisting = books.filter((item) => item.id !== nextBook.id);
+  return sortBooksForDisplay([...withoutExisting, nextBook]);
+}
+
+function upsertBooksInCollection(books: Book[], nextBooks: Book[]) {
+  const nextBookMap = new Map(nextBooks.map((book) => [book.id, book]));
+  const preservedBooks = books.filter((item) => !nextBookMap.has(item.id));
+  return sortBooksForDisplay([...preservedBooks, ...nextBooks]);
+}
+
+export const useLibraryStore = create<LibraryState>((set, get) => ({
   books: [],
   isLoading: false,
   errorMessage: null,
@@ -52,7 +75,7 @@ export const useLibraryStore = create<LibraryState>((set) => ({
   },
   saveBook: async (book, resolution) => {
     try {
-      const existingBooks = await bookRepository.list();
+      const existingBooks = get().books;
       const duplicateMatches = findDuplicateMatches(book, existingBooks, book.id);
       const currentBook = existingBooks.find((item) => item.id === book.id);
 
@@ -69,20 +92,33 @@ export const useLibraryStore = create<LibraryState>((set) => ({
           throw new Error("Nie udało się znaleźć wpisu do nadpisania.");
         }
 
-        await bookRepository.save({
+        const overwrittenBook: Book = {
           ...book,
           id: targetBook.id,
           createdAt: targetBook.createdAt
-        });
+        };
+
+        await bookRepository.save(overwrittenBook);
 
         if (currentBook && currentBook.id !== targetBook.id) {
           await bookRepository.remove(currentBook.id);
         }
+
+        const nextBooks = existingBooks.filter(
+          (item) => item.id !== targetBook.id && item.id !== currentBook?.id
+        );
+
+        set({
+          books: upsertBookInCollection(nextBooks, overwrittenBook),
+          errorMessage: null
+        });
       } else {
         await bookRepository.save(book);
+        set({
+          books: upsertBookInCollection(existingBooks, book),
+          errorMessage: null
+        });
       }
-      const books = await bookRepository.list();
-      set({ books, errorMessage: null });
     } catch (error) {
       const resolvedError = toLibraryError(
         error,
@@ -99,8 +135,10 @@ export const useLibraryStore = create<LibraryState>((set) => ({
   saveBooksBulk: async (booksToSave) => {
     try {
       await bookRepository.saveMany(booksToSave);
-      const books = await bookRepository.list();
-      set({ books, errorMessage: null });
+      set({
+        books: upsertBooksInCollection(get().books, booksToSave),
+        errorMessage: null
+      });
     } catch (error) {
       const resolvedError = toLibraryError(
         error,
@@ -117,8 +155,17 @@ export const useLibraryStore = create<LibraryState>((set) => ({
   applyBatchUpdate: async (ids, changes) => {
     try {
       await bookRepository.updateMany(ids, changes);
-      const books = await bookRepository.list();
-      set({ books, errorMessage: null });
+      const selectedIds = new Set(ids);
+      const nextBooks = get().books.map((book) =>
+        selectedIds.has(book.id)
+          ? {
+              ...book,
+              ...changes
+            }
+          : book
+      );
+
+      set({ books: nextBooks, errorMessage: null });
     } catch (error) {
       const resolvedError = toLibraryError(
         error,
@@ -135,8 +182,10 @@ export const useLibraryStore = create<LibraryState>((set) => ({
   deleteBook: async (id) => {
     try {
       await bookRepository.remove(id);
-      const books = await bookRepository.list();
-      set({ books, errorMessage: null });
+      set({
+        books: get().books.filter((book) => book.id !== id),
+        errorMessage: null
+      });
     } catch (error) {
       const resolvedError = toLibraryError(
         error,
