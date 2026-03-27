@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import {
   Alert,
   FlatList,
@@ -21,7 +21,7 @@ import {
   pickBestRemoteBookMatch,
   searchBooksOnline
 } from "@/features/catalog/bookLookupService";
-import { bookRepository } from "@/storage/bookRepository";
+import { bookRepository, type CatalogFilterQuery } from "@/storage/bookRepository";
 import { collectDuplicateBookIds } from "@/features/catalog/duplicateDetection";
 import { normalizeGenreLabel } from "@/features/catalog/genreCatalog";
 import { BookEditorScreen } from "@/screens/BookEditorScreen";
@@ -406,6 +406,53 @@ export function LibraryScreen({ onStartScan }: LibraryScreenProps) {
     toggleQuickFilter("no_genre");
   };
 
+  const buildCatalogFilterQuery = useCallback(
+    () => ({
+      query,
+      genre: genreFilter !== ALL_GENRES_FILTER ? genreFilter : undefined,
+      location: locationFilter !== ALL_LOCATIONS_FILTER ? locationFilter : undefined,
+      quickFilter: activeQuickFilter,
+      sortKey
+    }),
+    [activeQuickFilter, genreFilter, locationFilter, query, sortKey]
+  );
+
+  const loadAllFilteredBooks = useCallback(async () => {
+    if (!usesRepositoryFiltering) {
+      return visibleBooks;
+    }
+
+    if (filteredBooks.length >= filteredTotalBooks && filteredTotalBooks > 0) {
+      return filteredBooks;
+    }
+
+    const filterQuery = buildCatalogFilterQuery();
+    const total = await bookRepository.countFiltered(filterQuery);
+    const allBooks: Book[] = [];
+
+    for (let offset = 0; offset < total; offset += FILTERED_PAGE_SIZE) {
+      const page = await bookRepository.listFilteredPage({
+        ...filterQuery,
+        offset,
+        limit: FILTERED_PAGE_SIZE
+      });
+
+      allBooks.push(...page);
+
+      if (page.length < FILTERED_PAGE_SIZE) {
+        break;
+      }
+    }
+
+    return allBooks;
+  }, [
+    buildCatalogFilterQuery,
+    filteredBooks,
+    filteredTotalBooks,
+    usesRepositoryFiltering,
+    visibleBooks
+  ]);
+
   const selectAllVisibleBooks = () => {
     replaceSelection(visibleBooks.map((book) => book.id));
   };
@@ -481,7 +528,7 @@ export function LibraryScreen({ onStartScan }: LibraryScreenProps) {
     const targetIds = isSelectionMode
       ? [...selectedBookIdsRef.current]
       : isLocationFilterContext
-        ? visibleBooks.map((book) => book.id)
+        ? (await loadAllFilteredBooks()).map((book) => book.id)
         : [];
 
     if (!targetIds.length) {
@@ -513,9 +560,23 @@ export function LibraryScreen({ onStartScan }: LibraryScreenProps) {
       return;
     }
 
+    const filterContextBooks =
+      !isSelectionMode && isLookupFilterContext
+        ? await loadAllFilteredBooks()
+        : visibleBooks;
+
     const booksMissingData = isSelectionMode
       ? selectedBooksMissingRemoteData
-      : quickFilteredLookupBooks;
+      : filterContextBooks.filter((book) => {
+          if (forceRetryLookup) {
+            return !book.isbn?.trim() || !book.genre?.trim();
+          }
+
+          return (
+            (!book.isbn?.trim() || !book.genre?.trim()) &&
+            book.remoteLookupStatus !== "not_found"
+          );
+        });
 
     if (!booksMissingData.length) {
       setIsbnEnrichmentMessage(appText.library.enrichingMissingDataNothingToDo);
